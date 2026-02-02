@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Namespace Diagnostics - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}/resources/namespaces(id=${cluster.id})}">Namespaces</a></li>
+                <li class="breadcrumb-item active" th:text="${namespace}">Namespace</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-activity me-2 text-warning"></i>Namespace Diagnostics: <span class="text-primary" th:text="${namespace}">namespace</span></h2>
+            <button class="btn btn-primary" onclick="location.reload()"><i class="bi bi-arrow-clockwise me-1"></i>Rescan</button>
+        </div>
+
+        <!-- Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card border-danger">
+                    <div class="stat-value text-danger" th:text="${statistics.critical}">0</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-warning">
+                    <div class="stat-value text-warning" th:text="${statistics.high}">0</div>
+                    <div class="stat-label">High</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-info">
+                    <div class="stat-value text-info" th:text="${statistics.medium}">0</div>
+                    <div class="stat-label">Medium</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-secondary">
+                    <div class="stat-value text-secondary" th:text="${statistics.low}">0</div>
+                    <div class="stat-label">Low</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- No Issues -->
+        <div th:if="${diagnoses == null or diagnoses.empty}" class="alert alert-success">
+            <i class="bi bi-check-circle me-2"></i>No faults detected. Everything looks healthy.
+        </div>
+
+        <!-- Diagnoses -->
+        <div th:if="${diagnoses != null and !diagnoses.empty}">
+            <div th:each="diagnosis : ${diagnoses}" class="card mb-3">
+                <div class="card-header">
+                    <strong th:text="${diagnosis.fault.faultType.description}">Fault</strong>
+                    <span class="badge bg-secondary ms-2" th:text="${diagnosis.fault.resourceName}">Resource</span>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning mb-3" th:text="${diagnosis.fault.summary}">Summary</div>
+
+                    <div th:if="${diagnosis.rootCause != null}" class="mb-3">
+                        <h6><i class="bi bi-lightbulb me-1"></i>Root Cause</h6>
+                        <div class="bg-light p-2 rounded" style="white-space:pre-wrap;" th:text="${diagnosis.rootCause}">Root cause</div>
+                    </div>
+
+                    <div th:if="${diagnosis.solutions != null and !diagnosis.solutions.empty}" class="mb-3">
+                        <h6><i class="bi bi-tools me-1"></i>Solutions</h6>
+                        <ol>
+                            <li th:each="sol : ${diagnosis.solutions}" th:utext="${sol}">Solution</li>
+                        </ol>
+                    </div>
+
+                    <div th:if="${diagnosis.preventions != null and !diagnosis.preventions.empty}">
+                        <h6><i class="bi bi-shield-check me-1"></i>Prevention</h6>
+                        <ul>
+                            <li th:each="prev : ${diagnosis.preventions}" th:utext="${prev}">Prevention</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

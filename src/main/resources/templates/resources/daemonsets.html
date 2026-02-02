@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DaemonSets - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item active">DaemonSets</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="bi bi-broadcast me-2"></i>DaemonSets</h2>
+                <p class="text-muted mb-0" th:text="${namespace ?: 'All Namespaces'}">All Namespaces</p>
+            </div>
+            <div class="d-flex gap-2">
+                <select class="form-select" style="width: auto;" onchange="changeNamespace(this.value)">
+                    <option value="">All Namespaces</option>
+                    <option th:each="ns : ${namespaces}" th:value="${ns}" th:text="${ns}" th:selected="${ns == namespace}"></option>
+                </select>
+                <button class="btn btn-outline-secondary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><i class="bi bi-broadcast me-2"></i>DaemonSet List</div>
+            <div class="card-body p-0">
+                <div th:if="${daemonsets == null or daemonsets.empty}" class="empty-state">
+                    <i class="bi bi-broadcast"></i>
+                    <h5>No DaemonSets Found</h5>
+                    <p class="text-muted">No daemonsets in selected namespace</p>
+                </div>
+                <div th:if="${daemonsets != null and !daemonsets.empty}" class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Namespace</th>
+                                <th>Desired</th>
+                                <th>Current</th>
+                                <th>Ready</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="ds : ${daemonsets}">
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/daemonsets/{ns}/{name}(cid=${cluster.id}, ns=${ds.metadata.namespace}, name=${ds.metadata.name})}"
+                                       th:text="${ds.metadata.name}">daemonset</a>
+                                </td>
+                                <td><span class="badge bg-secondary" th:text="${ds.metadata.namespace}">default</span></td>
+                                <td th:text="${ds.status.desiredNumberScheduled ?: 0}">0</td>
+                                <td th:text="${ds.status.currentNumberScheduled ?: 0}">0</td>
+                                <td th:text="${ds.status.numberReady ?: 0}">0</td>
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/daemonsets/{ns}/{name}(cid=${cluster.id}, ns=${ds.metadata.namespace}, name=${ds.metadata.name})}"
+                                       class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        const clusterId = /*[[${cluster.id}]]*/ '';
+        function changeNamespace(ns) {
+            window.location.href = ns ? `/clusters/${clusterId}/resources/daemonsets?namespace=${ns}` : `/clusters/${clusterId}/resources/daemonsets`;
+        }
+    </script>
+</body>
+</html>

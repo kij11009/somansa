@@ -1,0 +1,22 @@
+# Readiness Probe 실패 테스트
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-probe-test
+  namespace: default
+  labels:
+    app: test
+    fault-type: readiness-probe
+spec:
+  containers:
+  - name: probe-test
+    image: nginx:latest
+    ports:
+    - containerPort: 80
+    readinessProbe:
+      httpGet:
+        path: /nonexistent-health  # 존재하지 않는 경로
+        port: 80
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 3

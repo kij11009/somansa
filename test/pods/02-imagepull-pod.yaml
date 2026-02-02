@@ -1,0 +1,21 @@
+# ImagePullBackOff 테스트 - 존재하지 않는 이미지
+apiVersion: v1
+kind: Pod
+metadata:
+  name: imagepull-test
+  namespace: default
+  labels:
+    app: test
+    fault-type: imagepull
+spec:
+  containers:
+  - name: nonexistent-image
+    # 존재하지 않는 이미지
+    image: nonexistent-registry.io/nonexistent-image:v999
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"

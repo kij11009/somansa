@@ -1,0 +1,22 @@
+# Deployment Unavailable 테스트 - Pod이 시작되지 않음
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unavailable-deployment-test
+  namespace: default
+  labels:
+    app: test
+    fault-type: deployment-unavailable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: unavailable-test
+  template:
+    metadata:
+      labels:
+        app: unavailable-test
+    spec:
+      containers:
+      - name: failing-container
+        image: nonexistent-image:latest  # 존재하지 않는 이미지

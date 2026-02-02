@@ -1,0 +1,48 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-doctor-reader
+rules:
+# Core resources
+- apiGroups: [""]
+  resources:
+    - nodes
+    - namespaces
+    - pods
+    - pods/log
+    - services
+    - endpoints
+    - configmaps
+    - events
+    - persistentvolumes
+    - persistentvolumeclaims
+  verbs: ["get", "list", "watch"]
+
+# Apps resources
+- apiGroups: ["apps"]
+  resources:
+    - deployments
+    - replicasets
+    - statefulsets
+    - daemonsets
+  verbs: ["get", "list", "watch"]
+
+# Batch resources
+- apiGroups: ["batch"]
+  resources:
+    - jobs
+    - cronjobs
+  verbs: ["get", "list", "watch"]
+
+# Networking
+- apiGroups: ["networking.k8s.io"]
+  resources:
+    - ingresses
+    - networkpolicies
+  verbs: ["get", "list", "watch"]
+
+# Storage
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - storageclasses
+  verbs: ["get", "list", "watch"]

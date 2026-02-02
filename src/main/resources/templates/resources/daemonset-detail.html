@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DaemonSet Detail - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>Home</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}/resources/daemonsets(id=${cluster.id})}">DaemonSets</a></li>
+                <li class="breadcrumb-item active" th:text="${daemonset.metadata.name}">DaemonSet</li>
+            </ol>
+        </nav>
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded d-flex align-items-center justify-content-center"
+                     th:style="${(daemonset.status.numberReady ?: 0) == (daemonset.status.desiredNumberScheduled ?: 0)} ? 'width:56px;height:56px;background:linear-gradient(135deg, #198754, #20c997);border-radius:0.75rem;' : 'width:56px;height:56px;background:linear-gradient(135deg, #ffc107, #fd7e14);border-radius:0.75rem;'">
+                    <i class="bi bi-broadcast text-white" style="font-size:1.75rem;"></i>
+                </div>
+                <div>
+                    <h2 class="mb-1" th:text="${daemonset.metadata.name}">daemonset</h2>
+                    <span class="badge bg-secondary me-2" th:text="${daemonset.metadata.namespace}">default</span>
+                    <span th:if="${(daemonset.status.numberReady ?: 0) == (daemonset.status.desiredNumberScheduled ?: 0)}" class="badge bg-success">Healthy</span>
+                    <span th:unless="${(daemonset.status.numberReady ?: 0) == (daemonset.status.desiredNumberScheduled ?: 0)}" class="badge bg-warning text-dark">Degraded</span>
+                </div>
+            </div>
+            <a th:href="@{/clusters/{id}/resources/daemonsets(id=${cluster.id})}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Status Overview</div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-bullseye"></i> Desired</div>
+                            <div class="info-value fs-5 fw-bold" th:text="${daemonset.status.desiredNumberScheduled ?: 0}">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-arrow-right-circle"></i> Current</div>
+                            <div class="info-value fs-5" th:text="${daemonset.status.currentNumberScheduled ?: 0}">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-check-circle"></i> Ready</div>
+                            <div class="info-value fs-5"
+                                 th:text="${daemonset.status.numberReady ?: 0}"
+                                 th:class="${(daemonset.status.numberReady ?: 0) == (daemonset.status.desiredNumberScheduled ?: 0)} ? 'text-success fw-bold' : 'text-warning fw-bold'">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-cloud-check"></i> Available</div>
+                            <div class="info-value fs-5" th:text="${daemonset.status.numberAvailable ?: 0}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-4">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-arrow-repeat"></i> Updated</div>
+                            <div class="info-value" th:text="${daemonset.status.updatedNumberScheduled ?: 0}">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-x-circle"></i> Unavailable</div>
+                            <div class="info-value" th:text="${daemonset.status.numberUnavailable ?: 0}"
+                                 th:class="${(daemonset.status.numberUnavailable ?: 0) > 0} ? 'text-danger fw-bold' : ''">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-calendar-x"></i> Misscheduled</div>
+                            <div class="info-value" th:text="${daemonset.status.numberMisscheduled ?: 0}"
+                                 th:class="${(daemonset.status.numberMisscheduled ?: 0) > 0} ? 'text-danger fw-bold' : ''">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6 col-md-6">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-calendar3"></i> Created</div>
+                            <div class="info-value small" th:text="${daemonset.metadata.creationTimestamp}">2024-01-01</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-6">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-fingerprint"></i> UID</div>
+                            <div class="info-value"><code class="small" th:text="${daemonset.metadata.uid}">uid</code></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Strategy -->
+        <div class="card mb-4" th:if="${daemonset.spec.updateStrategy != null}">
+            <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Update Strategy</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6 col-md-4">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-gear"></i> Type</div>
+                            <div class="info-value"><span class="badge bg-info" th:text="${daemonset.spec.updateStrategy.type ?: 'RollingUpdate'}">RollingUpdate</span></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4" th:if="${daemonset.spec.updateStrategy.rollingUpdate != null}">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-dash-circle"></i> Max Unavailable</div>
+                            <div class="info-value" th:text="${daemonset.spec.updateStrategy.rollingUpdate.maxUnavailable ?: 1}">1</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4" th:if="${daemonset.spec.updateStrategy.rollingUpdate != null}">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-plus-circle"></i> Max Surge</div>
+                            <div class="info-value" th:text="${daemonset.spec.updateStrategy.rollingUpdate.maxSurge ?: 0}">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selector -->
+        <div class="card mb-4" th:if="${daemonset.spec.selector != null and daemonset.spec.selector.matchLabels != null}">
+            <div class="card-header"><i class="bi bi-funnel me-2"></i>Selector</div>
+            <div class="card-body">
+                <span th:each="entry : ${daemonset.spec.selector.matchLabels}" class="badge bg-primary me-1 mb-1">
+                    <span th:text="${entry.key + '=' + entry.value}">app=myapp</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Containers -->
+        <div class="card mb-4" th:if="${daemonset.spec.template.spec.containers != null}">
+            <div class="card-header"><i class="bi bi-box-seam me-2"></i>Container Specifications</div>
+            <div class="card-body">
+                <div th:each="container, iterStat : ${daemonset.spec.template.spec.containers}"
+                     th:class="${!iterStat.last} ? 'mb-4 pb-4 border-bottom' : ''">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="rounded d-flex align-items-center justify-content-center"
+                             style="width:36px;height:36px;background:linear-gradient(135deg, #6c757d, #adb5bd);border-radius:0.5rem;">
+                            <i class="bi bi-terminal text-white" style="font-size:1rem;"></i>
+                        </div>
+                        <div>
+                            <div class="fw-semibold" th:text="${container.name}">container</div>
+                            <code class="small text-muted" th:text="${container.image}">image:latest</code>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4" th:if="${container.ports != null and !container.ports.empty}">
+                            <div class="info-box">
+                                <div class="info-label"><i class="bi bi-ethernet"></i> Ports</div>
+                                <div class="info-value">
+                                    <span th:each="port : ${container.ports}" class="badge bg-secondary me-1">
+                                        <span th:text="${port.containerPort}">80</span>/<span th:text="${port.protocol ?: 'TCP'}">TCP</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4" th:if="${container.resources != null and container.resources.requests != null}">
+                            <div class="info-box">
+                                <div class="info-label"><i class="bi bi-arrow-down-circle"></i> Requests</div>
+                                <div class="info-value small">
+                                    <span th:if="${container.resources.requests.get('cpu') != null}">CPU: <code th:text="${container.resources.requests.get('cpu')}">100m</code></span>
+                                    <span th:if="${container.resources.requests.get('memory') != null}" class="ms-2">Mem: <code th:text="${container.resources.requests.get('memory')}">128Mi</code></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4" th:if="${container.resources != null and container.resources.limits != null}">
+                            <div class="info-box">
+                                <div class="info-label"><i class="bi bi-arrow-up-circle"></i> Limits</div>
+                                <div class="info-value small">
+                                    <span th:if="${container.resources.limits.get('cpu') != null}">CPU: <code th:text="${container.resources.limits.get('cpu')}">500m</code></span>
+                                    <span th:if="${container.resources.limits.get('memory') != null}" class="ms-2">Mem: <code th:text="${container.resources.limits.get('memory')}">512Mi</code></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pods -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-box me-2"></i>Pods
+                <span class="badge bg-secondary ms-2" th:text="${#lists.size(pods)}">0</span>
+            </div>
+            <div class="card-body p-0">
+                <div th:if="${pods == null or pods.empty}" class="empty-state py-4">
+                    <div class="empty-icon" style="width:60px;height:60px;">
+                        <i class="bi bi-inbox" style="font-size:1.75rem;"></i>
+                    </div>
+                    <p class="text-muted mb-0">No pods found</p>
+                </div>
+                <div th:unless="${pods == null or pods.empty}" class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr><th>Name</th><th>Node</th><th>Status</th><th>Ready</th><th>Restarts</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="pod : ${pods}">
+                                <td th:text="${pod.metadata.name}">pod</td>
+                                <td th:text="${pod.spec.nodeName ?: '-'}">node</td>
+                                <td>
+                                    <span th:if="${pod.status.phase == 'Running'}" class="badge bg-success">Running</span>
+                                    <span th:if="${pod.status.phase == 'Pending'}" class="badge bg-warning">Pending</span>
+                                    <span th:if="${pod.status.phase == 'Failed'}" class="badge bg-danger">Failed</span>
+                                    <span th:if="${pod.status.phase == 'Succeeded'}" class="badge bg-success">Succeeded</span>
+                                    <span th:if="${pod.status.phase == 'Unknown'}" class="badge bg-secondary">Unknown</span>
+                                </td>
+                                <td th:text="${pod.status.containerStatuses != null ? (#lists.size(pod.status.containerStatuses.?[ready == true]) + '/' + #lists.size(pod.status.containerStatuses)) : '0/0'}">1/1</td>
+                                <td th:if="${pod.status.containerStatuses != null and !pod.status.containerStatuses.empty}"
+                                    th:text="${pod.status.containerStatuses[0].restartCount}"
+                                    th:class="${pod.status.containerStatuses[0].restartCount > 0} ? 'text-danger fw-bold' : ''">0</td>
+                                <td th:unless="${pod.status.containerStatuses != null and !pod.status.containerStatuses.empty}">-</td>
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/pods/{ns}/{name}(cid=${cluster.id}, ns=${pod.metadata.namespace}, name=${pod.metadata.name})}"
+                                       class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conditions -->
+        <div class="card mb-4" th:if="${daemonset.status.conditions != null and !daemonset.status.conditions.empty}">
+            <div class="card-header"><i class="bi bi-list-check me-2"></i>Conditions</div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr><th>Type</th><th>Status</th><th>Reason</th><th>Message</th><th>Last Transition</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="condition : ${daemonset.status.conditions}">
+                            <td><strong th:text="${condition.type}">Available</strong></td>
+                            <td>
+                                <span th:if="${condition.status == 'True'}" class="badge bg-success">True</span>
+                                <span th:if="${condition.status == 'False'}" class="badge bg-danger">False</span>
+                                <span th:if="${condition.status == 'Unknown'}" class="badge bg-secondary">Unknown</span>
+                            </td>
+                            <td th:text="${condition.reason}">Reason</td>
+                            <td class="small text-muted" th:text="${condition.message}">Message</td>
+                            <td class="small" th:text="${condition.lastTransitionTime}">2024-01-01</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Labels & Annotations -->
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><i class="bi bi-tags me-2"></i>Labels</div>
+                    <div class="card-body">
+                        <div th:if="${daemonset.metadata.labels != null and !daemonset.metadata.labels.empty}">
+                            <span th:each="entry : ${daemonset.metadata.labels}" class="badge bg-secondary me-1 mb-1">
+                                <span th:text="${entry.key + '=' + entry.value}">key=value</span>
+                            </span>
+                        </div>
+                        <div th:unless="${daemonset.metadata.labels != null and !daemonset.metadata.labels.empty}" class="text-muted">
+                            No labels
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><i class="bi bi-card-text me-2"></i>Annotations</div>
+                    <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                        <div th:if="${daemonset.metadata.annotations != null and !daemonset.metadata.annotations.empty}">
+                            <div th:each="entry : ${daemonset.metadata.annotations}" class="small mb-2">
+                                <strong th:text="${entry.key}">key</strong>:
+                                <span class="text-muted text-break" th:text="${entry.value}">value</span>
+                            </div>
+                        </div>
+                        <div th:unless="${daemonset.metadata.annotations != null and !daemonset.metadata.annotations.empty}" class="text-muted">
+                            No annotations
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

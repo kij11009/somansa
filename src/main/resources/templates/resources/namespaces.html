@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Namespaces - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item active">Namespaces</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-folder me-2"></i>Namespaces</h2>
+            <button class="btn btn-outline-secondary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-folder me-2"></i>Namespace List</span>
+                <input type="text" class="form-control form-control-sm" style="width: 200px;" placeholder="Search..." id="searchInput" onkeyup="filterTable()">
+            </div>
+            <div class="card-body p-0">
+                <div th:if="${namespaces == null or namespaces.empty}" class="empty-state">
+                    <i class="bi bi-folder"></i>
+                    <h5>No Namespaces Found</h5>
+                    <p class="text-muted">No namespaces in this cluster</p>
+                </div>
+                <div th:if="${namespaces != null and !namespaces.empty}" class="table-responsive">
+                    <table class="table table-hover mb-0" id="nsTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="ns : ${namespaces}">
+                                <td><strong th:text="${ns.metadata.name}">default</strong></td>
+                                <td>
+                                    <span th:if="${ns.status != null and ns.status.phase == 'Active'}" class="badge bg-success">Active</span>
+                                    <span th:if="${ns.status != null and ns.status.phase == 'Terminating'}" class="badge bg-danger">Terminating</span>
+                                    <span th:unless="${ns.status != null and (ns.status.phase == 'Active' or ns.status.phase == 'Terminating')}" class="badge bg-secondary">Unknown</span>
+                                </td>
+                                <td class="text-muted small" th:text="${ns.metadata.creationTimestamp}">2024-01-01</td>
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/pods(cid=${cluster.id}, namespace=${ns.metadata.name})}"
+                                       class="btn btn-sm btn-outline-primary"><i class="bi bi-box me-1"></i>Pods</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function filterTable() {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('#nsTable tbody tr').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+            });
+        }
+    </script>
+</body>
+</html>

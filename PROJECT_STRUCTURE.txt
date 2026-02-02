@@ -1,0 +1,68 @@
+k8s-doctor/
+│
+├── 📄 Core Files
+│   ├── .env                    # 환경변수 (gitignored)
+│   ├── .env.example            # 환경변수 템플릿
+│   ├── .gitignore              # Git 제외 파일
+│   ├── build.gradle            # Gradle 빌드 설정
+│   ├── settings.gradle         # Gradle 프로젝트 설정
+│   ├── gradlew                 # Gradle Wrapper (Unix)
+│   ├── gradlew.bat             # Gradle Wrapper (Windows)
+│   └── modelkey.txt            # AI 모델 설정
+│
+├── 📚 Documentation
+│   ├── README.md               # 프로젝트 개요 및 실행 가이드
+│   ├── CLAUDE.md               # 상세 개발 가이드
+│   └── PROJECT_STRUCTURE.txt   # 이 파일
+│
+├── 📦 Source Code (src/)
+│   ├── main/
+│   │   ├── java/com/vibecoding/k8sdoctor/
+│   │   │   ├── K8sDoctorApplication.java
+│   │   │   ├── config/         # 설정 클래스 (4개)
+│   │   │   ├── controller/     # 컨트롤러 (3개)
+│   │   │   ├── service/        # 서비스 (3개)
+│   │   │   ├── repository/     # 저장소 (1개)
+│   │   │   ├── model/          # 도메인 모델 (7개)
+│   │   │   └── exception/      # 예외 처리 (3개)
+│   │   └── resources/
+│   │       ├── application.properties
+│   │       └── templates/      # Thymeleaf 템플릿 (10개)
+│   └── test/
+│
+├── ☸️  Kubernetes (k8s/)
+│   ├── README.md                         # K8s 설정 파일 가이드
+│   ├── k8s-doctor-clusterrole.yaml       # ClusterRole 정의 ⭐
+│   └── k8s-doctor-token-secret.yaml      # 영구 토큰 생성용 Secret ⭐
+│
+├── 📋 Product Requirements (prd/)
+│   ├── prd_step1.md
+│   ├── prd_step2.md
+│   ├── prd_step3.md
+│   ├── prd_step4.md
+│   ├── prd_step5.md
+│   ├── prd_step6.md
+│   └── prd_step7.md
+│
+└── 🔧 Setup (setup/)
+    ├── QUICK_START.md          # ⭐ 5분 빠른 시작 가이드
+    ├── README.md               # Setup 가이드 개요
+    └── docs/
+        └── service-account-setup.md      # 상세 가이드 (모든 K8s 지원)
+
+Total Files:
+- Java: 23 files
+- Templates: 10 files
+- Config: 7 files
+- Documentation: 6 files
+- Kubernetes YAML: 2 files (사용 중)
+- PRD: 7 files
+
+Key Features:
+✅ Multi-cluster support (Service Account Token 방식)
+✅ 모든 Kubernetes 클러스터 지원 (EKS, GKE, AKS, 바닐라, OpenShift)
+✅ CLI 도구 불필요 (aws, gcloud, az 설치 안 해도 됨)
+✅ 영구 토큰 지원 (만료 없음)
+✅ Read-only 권한으로 안전한 운영
+✅ 5분 빠른 시작 가이드 제공
+✅ Kubernetes 설정 파일 한곳에 정리 (k8s/)

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${cluster.name} + ' - K8s Doctor'">Cluster - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>Home</a>
+                <a class="nav-link active" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item active" th:text="${cluster.name}">Cluster</li>
+            </ol>
+        </nav>
+
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show">
+            <i class="bi bi-check-circle me-2"></i><span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+            <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded d-flex align-items-center justify-content-center"
+                     th:style="${cluster.status.name() == 'CONNECTED'} ? 'width:56px;height:56px;background:linear-gradient(135deg, #198754, #20c997);border-radius:0.75rem;' : 'width:56px;height:56px;background:linear-gradient(135deg, #dc3545, #fd7e14);border-radius:0.75rem;'">
+                    <i class="bi bi-hdd-network text-white" style="font-size:1.75rem;"></i>
+                </div>
+                <div>
+                    <h2 class="mb-1" th:text="${cluster.name}">Cluster</h2>
+                    <span class="badge" th:classappend="${cluster.status.name() == 'CONNECTED'} ? 'bg-success' : 'bg-danger'" th:text="${cluster.status}">CONNECTED</span>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <form th:action="@{/clusters/{id}/delete(id=${cluster.id})}" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this cluster?');">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+                <a th:href="@{/clusters}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Back to List
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-primary h-100">
+                    <div class="stat-value text-primary" th:text="${cluster.nodeCount}">0</div>
+                    <div class="stat-label">Nodes</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-info h-100">
+                    <div class="stat-value text-info" th:text="${cluster.namespaceCount}">0</div>
+                    <div class="stat-label">Namespaces</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-success h-100">
+                    <div class="stat-value text-success" th:text="${cluster.podCount}">0</div>
+                    <div class="stat-label">Pods</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-warning h-100">
+                    <div class="stat-value text-warning" style="font-size:1.5rem;" th:text="${cluster.version} ?: 'N/A'">v1.28</div>
+                    <div class="stat-label">Version</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Cluster Info -->
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <i class="bi bi-info-circle me-2"></i>Cluster Information
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="info-box">
+                                    <div class="info-label"><i class="bi bi-globe"></i> API Server</div>
+                                    <div class="info-value"><code th:text="${cluster.apiServerUrl}">https://...</code></div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="info-box">
+                                    <div class="info-label"><i class="bi bi-calendar3"></i> Created</div>
+                                    <div class="info-value" th:text="${cluster.createdAt} ?: 'N/A'">-</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="info-box">
+                                    <div class="info-label"><i class="bi bi-clock"></i> Last Check</div>
+                                    <div class="info-value" th:text="${cluster.lastChecked} ?: 'N/A'">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <i class="bi bi-lightning-charge me-2"></i>Quick Actions
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-4">
+                            <div class="col-4">
+                                <form th:action="@{/clusters/{id}/refresh(id=${cluster.id})}" method="post">
+                                    <button type="submit" class="quick-action-btn w-100 btn">
+                                        <i class="bi bi-arrow-clockwise text-primary"></i>
+                                        <span class="text-dark">Refresh</span>
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="col-4">
+                                <form th:action="@{/clusters/{id}/test(id=${cluster.id})}" method="post">
+                                    <button type="submit" class="quick-action-btn w-100 btn">
+                                        <i class="bi bi-check-circle text-success"></i>
+                                        <span class="text-dark">Test</span>
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="col-4">
+                                <a th:href="@{/clusters/{id}/diagnostics(id=${cluster.id})}" class="quick-action-btn w-100">
+                                    <i class="bi bi-activity text-warning"></i>
+                                    <span class="text-dark">Diagnose</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resources -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-grid me-2"></i>Browse Resources
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3"><i class="bi bi-hdd-stack me-2"></i>Cluster Resources</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a th:href="@{/clusters/{id}/resources/namespaces(id=${cluster.id})}" class="btn btn-outline-secondary resource-btn">
+                                <i class="bi bi-folder"></i>Namespaces
+                            </a>
+                            <a th:href="@{/clusters/{id}/resources/nodes(id=${cluster.id})}" class="btn btn-outline-secondary resource-btn">
+                                <i class="bi bi-hdd-rack"></i>Nodes
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3"><i class="bi bi-boxes me-2"></i>Workloads</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a th:href="@{/clusters/{id}/resources/pods(id=${cluster.id})}" class="btn btn-outline-primary resource-btn">
+                                <i class="bi bi-box"></i>Pods
+                            </a>
+                            <a th:href="@{/clusters/{id}/resources/deployments(id=${cluster.id})}" class="btn btn-outline-primary resource-btn">
+                                <i class="bi bi-layers"></i>Deployments
+                            </a>
+                            <a th:href="@{/clusters/{id}/resources/statefulsets(id=${cluster.id})}" class="btn btn-outline-primary resource-btn">
+                                <i class="bi bi-stack"></i>StatefulSets
+                            </a>
+                            <a th:href="@{/clusters/{id}/resources/daemonsets(id=${cluster.id})}" class="btn btn-outline-primary resource-btn">
+                                <i class="bi bi-broadcast"></i>DaemonSets
+                            </a>
+                            <a th:href="@{/clusters/{id}/resources/jobs(id=${cluster.id})}" class="btn btn-outline-primary resource-btn">
+                                <i class="bi bi-play-circle"></i>Jobs
+                            </a>
+                            <a th:href="@{/clusters/{id}/resources/cronjobs(id=${cluster.id})}" class="btn btn-outline-primary resource-btn">
+                                <i class="bi bi-clock-history"></i>CronJobs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

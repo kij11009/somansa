@@ -1,0 +1,246 @@
+# CronJob 테스트용 YAML
+# 사용법: kubectl apply -f test/cronjob-test.yaml
+# 삭제: kubectl delete -f test/cronjob-test.yaml
+
+---
+# 1. 매 분마다 실행되는 CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello-every-minute
+  namespace: default
+  labels:
+    app: test-cronjob
+    schedule: every-minute
+spec:
+  # 매 분마다 실행
+  schedule: "*/1 * * * *"
+  # Job History 보관 개수
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  # 동시 실행 정책: Allow(허용), Forbid(금지), Replace(교체)
+  concurrencyPolicy: Allow
+  # CronJob 일시 중지 여부
+  suspend: false
+  jobTemplate:
+    metadata:
+      labels:
+        app: test-cronjob
+        type: hello
+    spec:
+      template:
+        metadata:
+          labels:
+            app: test-cronjob
+            type: hello
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: hello
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - -c
+            args:
+            - |
+              echo "========================================="
+              echo "CronJob executed at: $(date)"
+              echo "Hello from K8s Doctor CronJob Test!"
+              echo "========================================="
+              echo "Hostname: $(hostname)"
+              echo "Current directory: $(pwd)"
+              ls -la
+              echo "Job completed successfully!"
+
+---
+# 2. 5분마다 실행 - Suspended (일시 중지)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: suspended-cronjob
+  namespace: default
+  labels:
+    app: test-cronjob
+    schedule: every-5-minutes
+    status: suspended
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  concurrencyPolicy: Forbid
+  # 일시 중지됨 - Job이 생성되지 않음
+  suspend: true
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: suspended
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - -c
+            - echo "This job is suspended and won't run"
+
+---
+# 3. 매시간 실행 - 백업 시뮬레이션
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hourly-backup
+  namespace: default
+  labels:
+    app: test-cronjob
+    schedule: hourly
+    type: backup
+spec:
+  # 매시간 0분에 실행
+  schedule: "0 * * * *"
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid  # 중복 실행 금지
+  suspend: false
+  # 시작 기한: 200초 안에 시작하지 못하면 실패
+  startingDeadlineSeconds: 200
+  jobTemplate:
+    spec:
+      # Job 완료 후 자동 삭제 (초 단위)
+      ttlSecondsAfterFinished: 3600  # 1시간 후 삭제
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - -c
+            args:
+            - |
+              echo "========================================="
+              echo "Backup Job started at: $(date)"
+              echo "========================================="
+              echo "Simulating database backup..."
+              sleep 10
+              echo "Creating backup file..."
+              echo "backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+              sleep 5
+              echo "Backup completed successfully!"
+              echo "========================================="
+
+---
+# 4. 매일 새벽 2시 실행 - 정리 작업
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-cleanup
+  namespace: default
+  labels:
+    app: test-cronjob
+    schedule: daily
+    type: cleanup
+spec:
+  # 매일 새벽 2시에 실행
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 7  # 7일치 보관
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Replace  # 이전 Job 대체
+  suspend: false
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: cleanup
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - -c
+            args:
+            - |
+              echo "Daily cleanup started at: $(date)"
+              echo "Cleaning up old files..."
+              echo "Simulating cleanup process..."
+              sleep 15
+              echo "Cleanup completed!"
+
+---
+# 5. 매주 월요일 오전 9시 - 리포트 생성
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: weekly-report
+  namespace: default
+  labels:
+    app: test-cronjob
+    schedule: weekly
+    type: report
+spec:
+  # 매주 월요일 오전 9시
+  schedule: "0 9 * * 1"
+  successfulJobsHistoryLimit: 10
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: report
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - -c
+            args:
+            - |
+              echo "========================================="
+              echo "Weekly Report Generation"
+              echo "Started at: $(date)"
+              echo "========================================="
+              echo "Collecting data..."
+              sleep 10
+              echo "Generating report..."
+              sleep 10
+              echo "Report generated: weekly-report-$(date +%Y%m%d).pdf"
+              echo "========================================="
+
+---
+# 6. 매달 1일 자정 - 월간 통계
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: monthly-stats
+  namespace: default
+  labels:
+    app: test-cronjob
+    schedule: monthly
+    type: statistics
+spec:
+  # 매달 1일 자정
+  schedule: "0 0 1 * *"
+  successfulJobsHistoryLimit: 12  # 1년치 보관
+  failedJobsHistoryLimit: 6
+  concurrencyPolicy: Forbid
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: stats
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Monthly statistics calculation started"
+              echo "Month: $(date +%B %Y)"
+              sleep 20
+              echo "Statistics completed!"

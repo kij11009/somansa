@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pod Detail - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>Home</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}/resources/pods(id=${cluster.id})}">Pods</a></li>
+                <li class="breadcrumb-item active" th:text="${pod.metadata.name}">Pod</li>
+            </ol>
+        </nav>
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded d-flex align-items-center justify-content-center"
+                     th:style="${pod.status.phase == 'Running'} ? 'width:56px;height:56px;background:linear-gradient(135deg, #198754, #20c997);border-radius:0.75rem;' : (${pod.status.phase == 'Pending'} ? 'width:56px;height:56px;background:linear-gradient(135deg, #ffc107, #fd7e14);border-radius:0.75rem;' : 'width:56px;height:56px;background:linear-gradient(135deg, #dc3545, #fd7e14);border-radius:0.75rem;')">
+                    <i class="bi bi-box text-white" style="font-size:1.75rem;"></i>
+                </div>
+                <div>
+                    <h2 class="mb-1" th:text="${pod.metadata.name}">pod-name</h2>
+                    <span class="badge bg-secondary me-2" th:text="${pod.metadata.namespace}">default</span>
+                    <span th:if="${pod.status.phase == 'Running'}" class="badge bg-success" th:text="${pod.status.phase}">Running</span>
+                    <span th:if="${pod.status.phase == 'Pending'}" class="badge bg-warning text-dark" th:text="${pod.status.phase}">Pending</span>
+                    <span th:if="${pod.status.phase == 'Failed'}" class="badge bg-danger" th:text="${pod.status.phase}">Failed</span>
+                    <span th:if="${pod.status.phase == 'Succeeded'}" class="badge bg-success" th:text="${pod.status.phase}">Succeeded</span>
+                    <span th:if="${pod.status.phase == 'Unknown'}" class="badge bg-secondary" th:text="${pod.status.phase}">Unknown</span>
+                </div>
+            </div>
+            <a th:href="@{/clusters/{id}/resources/pods(id=${cluster.id})}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Status Overview</div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-hdd-rack"></i> Node</div>
+                            <div class="info-value" th:text="${pod.spec.nodeName ?: 'N/A'}">node-1</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-diagram-3"></i> Pod IP</div>
+                            <div class="info-value"><code th:text="${pod.status.podIP ?: 'N/A'}">10.0.0.1</code></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-award"></i> QoS Class</div>
+                            <div class="info-value" th:text="${pod.status.qosClass ?: 'N/A'}">BestEffort</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-calendar3"></i> Created</div>
+                            <div class="info-value small" th:text="${pod.metadata.creationTimestamp}">2024-01-01</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-fingerprint"></i> UID</div>
+                            <div class="info-value"><code class="small" th:text="${pod.metadata.uid}">uid</code></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Container Statuses -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-terminal me-2"></i>Container Statuses</div>
+            <div class="card-body">
+                <div th:if="${pod.status.containerStatuses != null and !pod.status.containerStatuses.empty}">
+                    <div th:each="container, iterStat : ${pod.status.containerStatuses}"
+                         th:class="${!iterStat.last} ? 'mb-4 pb-4 border-bottom' : ''">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="rounded d-flex align-items-center justify-content-center"
+                                     th:style="${container.ready} ? 'width:36px;height:36px;background:linear-gradient(135deg, #198754, #20c997);border-radius:0.5rem;' : 'width:36px;height:36px;background:linear-gradient(135deg, #dc3545, #fd7e14);border-radius:0.5rem;'">
+                                    <i class="bi bi-box-seam text-white" style="font-size:1rem;"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold" th:text="${container.name}">container</div>
+                                    <code class="small text-muted" th:text="${container.image}">image:latest</code>
+                                </div>
+                            </div>
+                            <span th:if="${container.ready}" class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Ready</span>
+                            <span th:unless="${container.ready}" class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i>Not Ready</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="info-box">
+                                    <div class="info-label"><i class="bi bi-arrow-clockwise"></i> Restart Count</div>
+                                    <div class="info-value" th:classappend="${container.restartCount > 0} ? 'text-danger fw-bold' : ''" th:text="${container.restartCount}">0</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="info-box">
+                                    <div class="info-label"><i class="bi bi-fingerprint"></i> Container ID</div>
+                                    <div class="info-value small" style="word-break: break-all;" th:text="${container.containerID != null ? container.containerID : 'N/A'}">docker://abc123...</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="info-box">
+                                    <div class="info-label"><i class="bi bi-hourglass-split"></i> Started</div>
+                                    <div class="info-value small" th:text="${container.state?.running?.startedAt != null ? container.state.running.startedAt : 'N/A'}">N/A</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Container State Details -->
+                        <div class="mt-3" th:if="${container.state != null}">
+                            <div th:if="${container.state.running != null}" class="alert alert-success py-2 mb-0 d-flex align-items-center gap-2">
+                                <i class="bi bi-play-fill"></i> <strong>Running</strong>
+                            </div>
+                            <div th:if="${container.state.waiting != null}" class="alert alert-warning py-2 mb-0 d-flex align-items-center gap-2">
+                                <i class="bi bi-pause-fill"></i> <strong>Waiting:</strong> <span th:text="${container.state.waiting.reason}">Reason</span>
+                            </div>
+                            <div th:if="${container.state.terminated != null}" class="alert alert-danger py-2 mb-0 d-flex align-items-center gap-2">
+                                <i class="bi bi-stop-fill"></i> <strong>Terminated:</strong>
+                                <span th:text="${container.state.terminated.reason}">Reason</span>
+                                (Exit: <span th:text="${container.state.terminated.exitCode}">0</span>)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div th:unless="${pod.status.containerStatuses != null and !pod.status.containerStatuses.empty}" class="empty-state py-4">
+                    <div class="empty-icon" style="width:60px;height:60px;">
+                        <i class="bi bi-inbox" style="font-size:1.75rem;"></i>
+                    </div>
+                    <p class="text-muted mb-0">No container status available</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Events -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-bell me-2"></i>Recent Events</div>
+            <div class="card-body p-0">
+                <div th:if="${events != null and !events.empty}" class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 10%;">Type</th>
+                                <th style="width: 20%;">Reason</th>
+                                <th style="width: 50%;">Message</th>
+                                <th style="width: 20%;">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="event : ${events}">
+                                <td>
+                                    <span th:if="${event.type == 'Normal'}" class="badge bg-info">Normal</span>
+                                    <span th:if="${event.type == 'Warning'}" class="badge bg-warning text-dark">Warning</span>
+                                </td>
+                                <td><strong th:text="${event.reason}">Reason</strong></td>
+                                <td class="text-muted small" th:text="${event.message}">Message</td>
+                                <td class="small text-muted">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <span th:text="${event.lastTimestamp ?: event.firstTimestamp}">Time</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div th:unless="${events != null and !events.empty}" class="empty-state py-4">
+                    <div class="empty-icon" style="width:60px;height:60px;">
+                        <i class="bi bi-inbox" style="font-size:1.75rem;"></i>
+                    </div>
+                    <p class="text-muted mb-0">No events found for this pod</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Container Logs -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-terminal-fill me-2"></i>Container Logs</span>
+                <small class="text-muted">Recent 100 lines</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="log-viewer" th:text="${logs ?: 'No logs available'}">Loading logs...</div>
+            </div>
+        </div>
+
+        <!-- Labels & Annotations -->
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><i class="bi bi-tags me-2"></i>Labels</div>
+                    <div class="card-body">
+                        <div th:if="${pod.metadata.labels != null and !pod.metadata.labels.empty}">
+                            <span th:each="entry : ${pod.metadata.labels}" class="badge bg-secondary me-1 mb-1">
+                                <span th:text="${entry.key + '=' + entry.value}">key=value</span>
+                            </span>
+                        </div>
+                        <div th:unless="${pod.metadata.labels != null and !pod.metadata.labels.empty}" class="text-muted">
+                            No labels
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><i class="bi bi-card-text me-2"></i>Annotations</div>
+                    <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                        <div th:if="${pod.metadata.annotations != null and !pod.metadata.annotations.empty}">
+                            <div th:each="entry : ${pod.metadata.annotations}" class="small mb-2">
+                                <strong th:text="${entry.key}">key</strong>:
+                                <span class="text-muted text-break" th:text="${entry.value}">value</span>
+                            </div>
+                        </div>
+                        <div th:unless="${pod.metadata.annotations != null and !pod.metadata.annotations.empty}" class="text-muted">
+                            No annotations
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostics - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>Home</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item active">Diagnostics</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded d-flex align-items-center justify-content-center" style="width:56px;height:56px;background:linear-gradient(135deg, #ffc107, #fd7e14);border-radius:0.75rem;">
+                    <i class="bi bi-activity text-white" style="font-size:1.75rem;"></i>
+                </div>
+                <div>
+                    <h2 class="mb-1">Cluster Diagnostics</h2>
+                    <p class="text-muted mb-0">AI-powered analysis of cluster issues</p>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Rescan
+                </button>
+                <a th:href="@{/clusters/{id}(id=${cluster.id})}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-danger h-100">
+                    <div class="stat-value text-danger" th:text="${statistics.critical}">0</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-warning h-100">
+                    <div class="stat-value text-warning" th:text="${statistics.high}">0</div>
+                    <div class="stat-label">High</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-info h-100">
+                    <div class="stat-value text-info" th:text="${statistics.medium}">0</div>
+                    <div class="stat-label">Medium</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card stat-card border-secondary h-100">
+                    <div class="stat-value text-secondary" th:text="${statistics.low}">0</div>
+                    <div class="stat-label">Low</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-info d-flex align-items-center gap-3">
+            <div class="rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:linear-gradient(135deg, #0dcaf0, #6edff6);border-radius:0.5rem;flex-shrink:0;">
+                <i class="bi bi-robot text-white" style="font-size:1.25rem;"></i>
+            </div>
+            <div>
+                <strong>AI-Powered Analysis</strong>
+                <div class="small">Click on any issue to get AI-powered root cause analysis and recommendations.</div>
+            </div>
+        </div>
+
+        <!-- No Issues -->
+        <div th:if="${podsByNamespace == null or #maps.isEmpty(podsByNamespace)}" class="card">
+            <div class="card-body empty-state">
+                <div class="success-check">
+                    <i class="bi bi-check-lg"></i>
+                </div>
+                <h5 class="text-success">All Clear!</h5>
+                <p class="text-muted">No issues detected. All pods are running healthy.</p>
+                <a th:href="@{/clusters/{id}/resources/pods(id=${cluster.id})}" class="btn btn-primary">
+                    <i class="bi bi-box me-1"></i>Browse Pods
+                </a>
+            </div>
+        </div>
+
+        <!-- Issues by Namespace -->
+        <div th:if="${podsByNamespace != null and !#maps.isEmpty(podsByNamespace)}">
+            <div th:each="nsEntry : ${podsByNamespace}" class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center" style="cursor:pointer;" th:onclick="'toggleNs(\\'' + ${nsEntry.key} + '\\')'">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-folder text-muted"></i>
+                        <span class="fw-semibold" th:text="${nsEntry.key}">Namespace</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-warning" th:text="${#lists.size(nsEntry.value)} + ' issues'">0 issues</span>
+                        <i class="bi bi-chevron-down text-muted" th:id="'chevron-' + ${nsEntry.key}" style="transition:transform 0.2s;"></i>
+                    </div>
+                </div>
+                <div class="card-body" th:id="'ns-' + ${nsEntry.key}">
+                    <div th:each="pod : ${nsEntry.value}"
+                         class="fault-item"
+                         th:classappend="'severity-' + ${pod.severity.name().toLowerCase()}"
+                         th:data-cluster="${cluster.id}"
+                         th:data-namespace="${pod.namespace}"
+                         th:data-pod="${pod.name}"
+                         onclick="diagnosePod(this)">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="rounded d-flex align-items-center justify-content-center flex-shrink-0"
+                                     th:style="${pod.severity.name() == 'CRITICAL'} ? 'width:40px;height:40px;background:linear-gradient(135deg, #dc3545, #fd7e14);border-radius:0.5rem;' : (${pod.severity.name() == 'HIGH'} ? 'width:40px;height:40px;background:linear-gradient(135deg, #fd7e14, #ffc107);border-radius:0.5rem;' : 'width:40px;height:40px;background:linear-gradient(135deg, #0dcaf0, #6edff6);border-radius:0.5rem;')">
+                                    <i class="bi bi-exclamation-triangle text-white" style="font-size:1.1rem;"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-semibold" th:text="${pod.name}">pod-name</div>
+                                    <div class="text-muted small" th:text="${pod.summary}">Issue summary</div>
+                                </div>
+                            </div>
+                            <div class="text-end flex-shrink-0">
+                                <div class="small text-muted mb-1" th:text="${pod.faultType}">CRASH_LOOP</div>
+                                <span class="badge"
+                                      th:classappend="${pod.severity.name() == 'CRITICAL'} ? 'bg-danger' : (${pod.severity.name() == 'HIGH'} ? 'bg-warning text-dark' : 'bg-info')"
+                                      th:text="${pod.severity}">SEVERITY</span>
+                            </div>
+                        </div>
+                        <div class="diagnosis-panel" th:id="'diag-' + ${pod.namespace} + '-' + ${pod.name}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let diagnosing = null;
+
+        function toggleNs(ns) {
+            const el = document.getElementById('ns-' + ns);
+            const chev = document.getElementById('chevron-' + ns);
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                chev.style.transform = 'rotate(0deg)';
+            } else {
+                el.style.display = 'none';
+                chev.style.transform = 'rotate(-90deg)';
+            }
+        }
+
+        function diagnosePod(el) {
+            event.stopPropagation();
+            const cid = el.dataset.cluster;
+            const ns = el.dataset.namespace;
+            const pod = el.dataset.pod;
+            const panel = document.getElementById('diag-' + ns + '-' + pod);
+
+            if (panel.classList.contains('show') && panel.innerHTML.trim() && !panel.innerHTML.includes('loading-container')) {
+                panel.classList.toggle('show');
+                return;
+            }
+
+            if (diagnosing === pod) return;
+            diagnosing = pod;
+
+            panel.innerHTML = `
+                <div class="loading-container">
+                    <div class="loading-robot">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div class="loading-text">
+                        <div class="spinner"></div>
+                        <span>AI analyzing...</span>
+                    </div>
+                </div>
+            `;
+            panel.classList.add('show');
+
+            fetch(`/clusters/${cid}/diagnostics/api/pod/${ns}/${pod}`)
+                .then(r => r.json())
+                .then(data => {
+                    diagnosing = null;
+                    if (data.success && data.hasFaults) {
+                        showDiagnosis(panel, data.diagnosis);
+                    } else if (data.success) {
+                        panel.innerHTML = `
+                            <div class="text-center py-3">
+                                <div class="success-check">
+                                    <i class="bi bi-check-lg"></i>
+                                </div>
+                                <div class="text-success fw-semibold">No faults detected</div>
+                            </div>
+                        `;
+                    } else {
+                        panel.innerHTML = `
+                            <div class="alert alert-danger mb-0 d-flex align-items-center gap-2">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <span>Error: ${esc(data.error || 'Unknown error')}</span>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(e => {
+                    diagnosing = null;
+                    panel.innerHTML = `
+                        <div class="alert alert-danger mb-0 d-flex align-items-center gap-2">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <span>Failed: ${esc(e.message)}</span>
+                        </div>
+                    `;
+                });
+        }
+
+        function showDiagnosis(panel, d) {
+            let html = '';
+
+            if (d.rootCause) {
+                html += `
+                    <div class="mb-3">
+                        <h6 class="d-flex align-items-center gap-2">
+                            <span class="rootcause-icon"><i class="bi bi-lightbulb"></i></span>
+                            Root Cause
+                        </h6>
+                        <div class="bg-light p-3 rounded" style="white-space:pre-wrap;">${esc(d.rootCause)}</div>
+                    </div>
+                `;
+            }
+
+            if (d.solutions && d.solutions.length) {
+                html += `
+                    <div class="mb-3">
+                        <h6 class="d-flex align-items-center gap-2">
+                            <span class="solution-icon"><i class="bi bi-tools"></i></span>
+                            Solutions
+                        </h6>
+                        <ol class="mb-0">
+                `;
+                d.solutions.forEach(s => html += `<li>${renderContent(s)}</li>`);
+                html += '</ol></div>';
+            }
+
+            if (d.preventions && d.preventions.length) {
+                html += `
+                    <div>
+                        <h6 class="d-flex align-items-center gap-2">
+                            <span class="prevention-icon"><i class="bi bi-shield-check"></i></span>
+                            Prevention
+                        </h6>
+                        <ul class="mb-0">
+                `;
+                d.preventions.forEach(p => html += `<li>${esc(p)}</li>`);
+                html += '</ul></div>';
+            }
+
+            panel.innerHTML = html || '<div class="text-muted text-center py-3">No diagnosis available</div>';
+        }
+
+        function esc(t) {
+            if (!t) return '';
+            const d = document.createElement('div');
+            d.textContent = t;
+            return d.innerHTML;
+        }
+
+        function renderContent(text) {
+            if (!text) return '';
+            if (text.includes('yaml-block') || text.includes('<code>') || text.includes('<pre>')) {
+                return text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+            }
+            return esc(text);
+        }
+
+        function copyYaml(btn) {
+            const code = btn.previousElementSibling.querySelector('code') || btn.previousElementSibling;
+            const text = code.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const icon = btn.querySelector('i');
+                icon.className = 'bi bi-check';
+                setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 1500);
+            });
+        }
+    </script>
+</body>
+</html>

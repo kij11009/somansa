@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployments - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item active">Deployments</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="bi bi-layers me-2"></i>Deployments</h2>
+                <p class="text-muted mb-0" th:text="${namespace}">All Namespaces</p>
+            </div>
+            <div class="d-flex gap-2">
+                <select class="form-select" style="width: auto;" onchange="changeNamespace(this.value)" th:data-cluster="${cluster.id}">
+                    <option value="">All Namespaces</option>
+                    <option th:each="ns : ${namespaces}" th:value="${ns}" th:text="${ns}" th:selected="${ns == namespace}"></option>
+                </select>
+                <button class="btn btn-outline-secondary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-layers me-2"></i>Deployment List</span>
+                <input type="text" class="form-control form-control-sm" style="width: 200px;" placeholder="Search..." id="searchInput" onkeyup="filterTable()">
+            </div>
+            <div class="card-body p-0">
+                <div th:if="${deployments == null or deployments.empty}" class="empty-state">
+                    <i class="bi bi-layers"></i>
+                    <h5>No Deployments Found</h5>
+                    <p class="text-muted">No deployments in selected namespace</p>
+                </div>
+                <div th:if="${deployments != null and !deployments.empty}" class="table-responsive">
+                    <table class="table table-hover mb-0" id="deployTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Namespace</th>
+                                <th>Ready</th>
+                                <th>Up-to-date</th>
+                                <th>Available</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="deploy : ${deployments}">
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/deployments/{ns}/{name}(cid=${cluster.id}, ns=${deploy.metadata.namespace}, name=${deploy.metadata.name})}"
+                                       th:text="${deploy.metadata.name}">deployment</a>
+                                </td>
+                                <td><span class="badge bg-secondary" th:text="${deploy.metadata.namespace}">default</span></td>
+                                <td>
+                                    <span th:text="${(deploy.status.readyReplicas ?: 0) + '/' + (deploy.spec.replicas ?: 0)}"
+                                          th:class="${(deploy.status.readyReplicas ?: 0) == (deploy.spec.replicas ?: 0)} ? 'text-success' : 'text-warning'">0/1</span>
+                                </td>
+                                <td th:text="${deploy.status.updatedReplicas ?: 0}">0</td>
+                                <td th:text="${deploy.status.availableReplicas ?: 0}">0</td>
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/deployments/{ns}/{name}(cid=${cluster.id}, ns=${deploy.metadata.namespace}, name=${deploy.metadata.name})}"
+                                       class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        const clusterId = /*[[${cluster.id}]]*/ '';
+
+        function filterTable() {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('#deployTable tbody tr').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+            });
+        }
+
+        function changeNamespace(ns) {
+            window.location.href = ns ? `/clusters/${clusterId}/resources/deployments?namespace=${ns}` : `/clusters/${clusterId}/resources/deployments`;
+        }
+    </script>
+</body>
+</html>

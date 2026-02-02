@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CronJob Detail - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>Home</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}/resources/cronjobs(id=${cluster.id})}">CronJobs</a></li>
+                <li class="breadcrumb-item active" th:text="${cronjob.metadata.name}">CronJob</li>
+            </ol>
+        </nav>
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded d-flex align-items-center justify-content-center"
+                     th:style="${cronjob.spec.suspend} ? 'width:56px;height:56px;background:linear-gradient(135deg, #ffc107, #fd7e14);border-radius:0.75rem;' : 'width:56px;height:56px;background:linear-gradient(135deg, #198754, #20c997);border-radius:0.75rem;'">
+                    <i class="bi bi-clock-history text-white" style="font-size:1.75rem;"></i>
+                </div>
+                <div>
+                    <h2 class="mb-1" th:text="${cronjob.metadata.name}">cronjob</h2>
+                    <span class="badge bg-secondary me-2" th:text="${cronjob.metadata.namespace}">default</span>
+                    <span th:if="${cronjob.spec.suspend}" class="badge bg-warning text-dark">Suspended</span>
+                    <span th:unless="${cronjob.spec.suspend}" class="badge bg-success">Active</span>
+                </div>
+            </div>
+            <a th:href="@{/clusters/{id}/resources/cronjobs(id=${cluster.id})}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Status Overview</div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-calendar2-week"></i> Schedule</div>
+                            <div class="info-value"><code th:text="${cronjob.spec.schedule}">* * * * *</code></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-pause-circle"></i> Suspend</div>
+                            <div class="info-value">
+                                <span th:if="${cronjob.spec.suspend}" class="badge bg-warning">Yes</span>
+                                <span th:unless="${cronjob.spec.suspend}" class="badge bg-success">No</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-activity"></i> Active Jobs</div>
+                            <div class="info-value" th:text="${cronjob.status.active != null ? #lists.size(cronjob.status.active) : 0}"
+                                 th:class="${cronjob.status.active != null and #lists.size(cronjob.status.active) > 0} ? 'text-warning fw-bold' : ''">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-clock"></i> Last Schedule</div>
+                            <div class="info-value small" th:text="${cronjob.status.lastScheduleTime ?: 'Never'}">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-6">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-check-circle"></i> Last Successful</div>
+                            <div class="info-value small" th:text="${cronjob.status.lastSuccessfulTime ?: 'Never'}">-</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-6">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-calendar3"></i> Created</div>
+                            <div class="info-value small" th:text="${cronjob.metadata.creationTimestamp}">2024-01-01</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-fingerprint"></i> UID</div>
+                            <div class="info-value"><code class="small" th:text="${cronjob.metadata.uid}">uid</code></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-gear me-2"></i>Configuration</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-layers"></i> Concurrency</div>
+                            <div class="info-value"><span class="badge bg-info" th:text="${cronjob.spec.concurrencyPolicy ?: 'Allow'}">Allow</span></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-hourglass-split"></i> Starting Deadline</div>
+                            <div class="info-value" th:text="${cronjob.spec.startingDeadlineSeconds != null ? cronjob.spec.startingDeadlineSeconds + 's' : 'None'}">None</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-check2-square"></i> Success History</div>
+                            <div class="info-value" th:text="${cronjob.spec.successfulJobsHistoryLimit ?: 3}">3</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="info-box">
+                            <div class="info-label"><i class="bi bi-x-square"></i> Failed History</div>
+                            <div class="info-value" th:text="${cronjob.spec.failedJobsHistoryLimit ?: 1}">1</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Job Template -->
+        <div class="card mb-4" th:if="${cronjob.spec.jobTemplate != null and cronjob.spec.jobTemplate.spec.template.spec.containers != null}">
+            <div class="card-header"><i class="bi bi-box-seam me-2"></i>Job Template - Container Specifications</div>
+            <div class="card-body">
+                <div th:each="container, iterStat : ${cronjob.spec.jobTemplate.spec.template.spec.containers}"
+                     th:class="${!iterStat.last} ? 'mb-4 pb-4 border-bottom' : ''">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="rounded d-flex align-items-center justify-content-center"
+                             style="width:36px;height:36px;background:linear-gradient(135deg, #6c757d, #adb5bd);border-radius:0.5rem;">
+                            <i class="bi bi-terminal text-white" style="font-size:1rem;"></i>
+                        </div>
+                        <div>
+                            <div class="fw-semibold" th:text="${container.name}">container</div>
+                            <code class="small text-muted" th:text="${container.image}">image:latest</code>
+                        </div>
+                    </div>
+
+                    <div th:if="${container.command != null and !container.command.empty}" class="mb-3">
+                        <div class="text-muted small mb-1"><i class="bi bi-terminal me-1"></i>Command</div>
+                        <code class="d-block bg-light p-2 rounded small" th:text="${#strings.listJoin(container.command, ' ')}">command</code>
+                    </div>
+                    <div th:if="${container.args != null and !container.args.empty}" class="mb-3">
+                        <div class="text-muted small mb-1"><i class="bi bi-list me-1"></i>Args</div>
+                        <code class="d-block bg-light p-2 rounded small" th:text="${#strings.listJoin(container.args, ' ')}">args</code>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6" th:if="${container.resources != null and container.resources.requests != null}">
+                            <div class="info-box">
+                                <div class="info-label"><i class="bi bi-arrow-down-circle"></i> Requests</div>
+                                <div class="info-value small">
+                                    <span th:if="${container.resources.requests.get('cpu') != null}">CPU: <code th:text="${container.resources.requests.get('cpu')}">100m</code></span>
+                                    <span th:if="${container.resources.requests.get('memory') != null}" class="ms-2">Mem: <code th:text="${container.resources.requests.get('memory')}">128Mi</code></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" th:if="${container.resources != null and container.resources.limits != null}">
+                            <div class="info-box">
+                                <div class="info-label"><i class="bi bi-arrow-up-circle"></i> Limits</div>
+                                <div class="info-value small">
+                                    <span th:if="${container.resources.limits.get('cpu') != null}">CPU: <code th:text="${container.resources.limits.get('cpu')}">500m</code></span>
+                                    <span th:if="${container.resources.limits.get('memory') != null}" class="ms-2">Mem: <code th:text="${container.resources.limits.get('memory')}">512Mi</code></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Jobs -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-play-circle me-2"></i>Recent Jobs
+                <span class="badge bg-secondary ms-2" th:text="${jobs != null ? #lists.size(jobs) : 0}">0</span>
+            </div>
+            <div class="card-body p-0">
+                <div th:if="${jobs == null or jobs.empty}" class="empty-state py-4">
+                    <div class="empty-icon" style="width:60px;height:60px;">
+                        <i class="bi bi-inbox" style="font-size:1.75rem;"></i>
+                    </div>
+                    <p class="text-muted mb-0">No recent jobs</p>
+                </div>
+                <div th:unless="${jobs == null or jobs.empty}" class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr><th>Name</th><th>Status</th><th>Completions</th><th>Start Time</th><th>Duration</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="job : ${jobs}">
+                                <td th:text="${job.metadata.name}">job</td>
+                                <td>
+                                    <span th:if="${job.status.succeeded != null and job.status.succeeded > 0}" class="badge bg-success">Completed</span>
+                                    <span th:if="${job.status.failed != null and job.status.failed > 0}" class="badge bg-danger">Failed</span>
+                                    <span th:if="${(job.status.succeeded == null or job.status.succeeded == 0) and (job.status.failed == null or job.status.failed == 0)}" class="badge bg-warning">Running</span>
+                                </td>
+                                <td th:text="${(job.status.succeeded ?: 0) + '/' + (job.spec.completions ?: 1)}">0/1</td>
+                                <td class="small" th:text="${job.status.startTime ?: '-'}">-</td>
+                                <td class="small" th:text="${job.status.completionTime != null and job.status.startTime != null ? 'Completed' : (job.status.startTime != null ? 'Running' : '-')}">-</td>
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/jobs/{ns}/{name}(cid=${cluster.id}, ns=${job.metadata.namespace}, name=${job.metadata.name})}"
+                                       class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Jobs -->
+        <div class="card mb-4" th:if="${cronjob.status.active != null and !cronjob.status.active.empty}">
+            <div class="card-header"><i class="bi bi-activity me-2"></i>Currently Active Jobs</div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr><th>Name</th><th>Namespace</th><th>UID</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="activeJob : ${cronjob.status.active}">
+                            <td><strong th:text="${activeJob.name}">job-name</strong></td>
+                            <td><span class="badge bg-secondary" th:text="${activeJob.namespace}">default</span></td>
+                            <td><code class="small" th:text="${activeJob.uid}">uid</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Labels & Annotations -->
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><i class="bi bi-tags me-2"></i>Labels</div>
+                    <div class="card-body">
+                        <div th:if="${cronjob.metadata.labels != null and !cronjob.metadata.labels.empty}">
+                            <span th:each="entry : ${cronjob.metadata.labels}" class="badge bg-secondary me-1 mb-1">
+                                <span th:text="${entry.key + '=' + entry.value}">key=value</span>
+                            </span>
+                        </div>
+                        <div th:unless="${cronjob.metadata.labels != null and !cronjob.metadata.labels.empty}" class="text-muted">
+                            No labels
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><i class="bi bi-card-text me-2"></i>Annotations</div>
+                    <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                        <div th:if="${cronjob.metadata.annotations != null and !cronjob.metadata.annotations.empty}">
+                            <div th:each="entry : ${cronjob.metadata.annotations}" class="small mb-2">
+                                <strong th:text="${entry.key}">key</strong>:
+                                <span class="text-muted text-break" th:text="${entry.value}">value</span>
+                            </div>
+                        </div>
+                        <div th:unless="${cronjob.metadata.annotations != null and !cronjob.metadata.annotations.empty}" class="text-muted">
+                            No annotations
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

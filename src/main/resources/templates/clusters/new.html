@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Cluster - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+                <a class="nav-link active" th:href="@{/clusters/new}"><i class="bi bi-plus-circle me-1"></i>Add Cluster</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item active">Add Cluster</li>
+            </ol>
+        </nav>
+
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+            <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <h2 class="mb-4"><i class="bi bi-plus-circle me-2"></i>Add Cluster</h2>
+
+        <div class="row">
+            <div class="col-md-7">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-gear me-2"></i>Cluster Configuration</div>
+                    <div class="card-body">
+                        <form th:action="@{/clusters}" method="post">
+                            <div class="mb-3">
+                                <label class="form-label">Cluster Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" class="form-control" placeholder="my-production-cluster" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <input type="text" name="description" class="form-control" placeholder="Production cluster on AWS EKS">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">API Server URL <span class="text-danger">*</span></label>
+                                <input type="url" name="apiServerUrl" class="form-control" placeholder="https://kubernetes.example.com:6443" required>
+                                <div class="form-text">Find with: <code>kubectl cluster-info</code></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Service Account Token <span class="text-danger">*</span></label>
+                                <textarea name="token" class="form-control font-mono" rows="4" placeholder="eyJhbGciOiJSUzI1NiIsImtpZCI6Ii..." required></textarea>
+                                <div class="form-text">Generate with: <code>kubectl create token k8s-doctor-readonly</code></div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Cluster</button>
+                                <a th:href="@{/clusters}" class="btn btn-secondary">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-question-circle me-2"></i>Setup Guide</div>
+                    <div class="card-body">
+                        <h6>1. Create Service Account</h6>
+                        <div class="log-viewer mb-3">kubectl create serviceaccount k8s-doctor-readonly -n default
+kubectl create clusterrolebinding k8s-doctor-readonly-binding \
+  --clusterrole=view \
+  --serviceaccount=default:k8s-doctor-readonly</div>
+                        <h6>2. Generate Token</h6>
+                        <div class="log-viewer mb-3">kubectl create token k8s-doctor-readonly --duration=8760h</div>
+                        <p class="text-muted small">Duration 8760h = 1 year</p>
+                        <h6>3. Get API Server URL</h6>
+                        <div class="log-viewer mb-3">kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'</div>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-shield-check me-2"></i>
+                            <strong>Security:</strong> K8s Doctor uses read-only access via the <code>view</code> ClusterRole.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

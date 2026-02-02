@@ -1,0 +1,22 @@
+# CrashLoopBackOff 테스트 - 컨테이너가 즉시 종료됨
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crashloop-test
+  namespace: default
+  labels:
+    app: test
+    fault-type: crashloop
+spec:
+  containers:
+  - name: crash-container
+    image: busybox:latest
+    # 즉시 종료되는 명령어
+    command: ["sh", "-c", "exit 1"]
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"

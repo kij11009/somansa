@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nodes - K8s Doctor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link th:href="@{/css/k8s-doctor.css}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse me-2"></i>K8s Doctor</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                <a class="nav-link" th:href="@{/clusters}"><i class="bi bi-hdd-network me-1"></i>Clusters</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters}">Clusters</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/clusters/{id}(id=${cluster.id})}" th:text="${cluster.name}">Cluster</a></li>
+                <li class="breadcrumb-item active">Nodes</li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-hdd-rack me-2"></i>Nodes</h2>
+            <button class="btn btn-outline-secondary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-hdd-rack me-2"></i>Node List</span>
+                <input type="text" class="form-control form-control-sm" style="width: 200px;" placeholder="Search..." id="searchInput" onkeyup="filterTable()">
+            </div>
+            <div class="card-body p-0">
+                <div th:if="${nodes == null or nodes.empty}" class="empty-state">
+                    <i class="bi bi-hdd-rack"></i>
+                    <h5>No Nodes Found</h5>
+                    <p class="text-muted">No nodes in this cluster</p>
+                </div>
+                <div th:if="${nodes != null and !nodes.empty}" class="table-responsive">
+                    <table class="table table-hover mb-0" id="nodesTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Roles</th>
+                                <th>Version</th>
+                                <th>OS</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="node : ${nodes}">
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/nodes/{name}(cid=${cluster.id}, name=${node.metadata.name})}"
+                                       th:text="${node.metadata.name}">node-1</a>
+                                </td>
+                                <td>
+                                    <span th:with="ready=${node.status.conditions.?[type == 'Ready'][0]}">
+                                        <span th:if="${ready != null and ready.status == 'True'}" class="badge bg-success">Ready</span>
+                                        <span th:unless="${ready != null and ready.status == 'True'}" class="badge bg-danger">NotReady</span>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span th:if="${node.metadata.labels != null and node.metadata.labels.containsKey('node-role.kubernetes.io/control-plane')}"
+                                          class="badge bg-primary me-1">control-plane</span>
+                                    <span th:if="${node.metadata.labels != null and node.metadata.labels.containsKey('node-role.kubernetes.io/master')}"
+                                          class="badge bg-primary me-1">master</span>
+                                    <span th:unless="${node.metadata.labels != null and (node.metadata.labels.containsKey('node-role.kubernetes.io/control-plane') or node.metadata.labels.containsKey('node-role.kubernetes.io/master'))}"
+                                          class="badge bg-secondary">worker</span>
+                                </td>
+                                <td><code th:text="${node.status.nodeInfo.kubeletVersion}">v1.28.0</code></td>
+                                <td class="text-muted small" th:text="${node.status.nodeInfo.osImage}">Ubuntu</td>
+                                <td>
+                                    <a th:href="@{/clusters/{cid}/resources/nodes/{name}(cid=${cluster.id}, name=${node.metadata.name})}"
+                                       class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function filterTable() {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('#nodesTable tbody tr').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+            });
+        }
+    </script>
+</body>
+</html>

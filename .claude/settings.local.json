@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-17.0.17.10-hotspot\")",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
+      "Bash(timeout 30 ./gradlew.bat bootRun:*)",
+      "Bash(gradlew.bat build:*)",
+      "Bash(./gradlew.bat build:*)",
+      "Bash(cmd.exe /c \"cd /d D:\\\\workspace\\\\vibecoding\\\\k8s-doctor && gradlew.bat build -x test\")",
+      "Bash(del /F \"D:\\\\workspace\\\\vibecoding\\\\k8s-doctor\\\\data\\\\k8s-doctor.mv.db.lock.db\")",
+      "Bash(netstat:*)",
+      "Bash(taskkill //F //PID 19596)"
+    ]
+  }
+}
