@@ -5,6 +5,8 @@ import com.vibecoding.k8sdoctor.model.FaultInfo;
 import io.fabric8.kubernetes.api.model.Node;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.apps.Deployment;
+import io.fabric8.kubernetes.api.model.batch.v1.CronJob;
+import io.fabric8.kubernetes.api.model.batch.v1.Job;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -231,6 +233,108 @@ public class DiagnosticsService {
     }
 
     /**
+     * Job 스캔 (네임스페이스별)
+     */
+    public List<FaultInfo> scanJobsInNamespace(String clusterId, String namespace) {
+        log.info("Scanning jobs in namespace {} of cluster {}", namespace, clusterId);
+
+        List<FaultInfo> allFaults = new ArrayList<>();
+        List<Job> jobs = k8sService.listJobsInNamespace(clusterId, namespace);
+
+        for (Job job : jobs) {
+            List<FaultInfo> faults = faultService.detectFaults(clusterId, namespace, "Job", job);
+            faults.forEach(f -> {
+                Map<String, Object> context = f.getContext();
+                if (context == null || context.isEmpty()) {
+                    context = new java.util.HashMap<>();
+                } else {
+                    context = new java.util.HashMap<>(context);
+                }
+                context.put("clusterId", clusterId);
+                f.setContext(context);
+            });
+            allFaults.addAll(faults);
+        }
+
+        log.info("Found {} faults in {} jobs", allFaults.size(), jobs.size());
+        return allFaults;
+    }
+
+    /**
+     * 전체 Job 스캔
+     */
+    public List<FaultInfo> scanAllJobs(String clusterId) {
+        log.info("Scanning all jobs in cluster {}", clusterId);
+
+        List<FaultInfo> allFaults = new ArrayList<>();
+        List<Job> jobs = k8sService.listAllJobs(clusterId);
+
+        for (Job job : jobs) {
+            String namespace = job.getMetadata().getNamespace();
+            List<FaultInfo> faults = faultService.detectFaults(clusterId, namespace, "Job", job);
+            faults.forEach(f -> {
+                Map<String, Object> context = f.getContext();
+                if (context == null || context.isEmpty()) {
+                    context = new java.util.HashMap<>();
+                } else {
+                    context = new java.util.HashMap<>(context);
+                }
+                context.put("clusterId", clusterId);
+                f.setContext(context);
+            });
+            allFaults.addAll(faults);
+        }
+
+        log.info("Found {} faults in {} jobs", allFaults.size(), jobs.size());
+        return allFaults;
+    }
+
+    /**
+     * CronJob 스캔 (네임스페이스별)
+     */
+    public List<FaultInfo> scanCronJobsInNamespace(String clusterId, String namespace) {
+        log.info("Scanning cronjobs in namespace {} of cluster {}", namespace, clusterId);
+
+        List<FaultInfo> allFaults = new ArrayList<>();
+        List<CronJob> cronJobs = k8sService.listCronJobsInNamespace(clusterId, namespace);
+
+        for (CronJob cronJob : cronJobs) {
+            List<FaultInfo> faults = faultService.detectFaults(clusterId, namespace, "CronJob", cronJob);
+            faults.forEach(f -> {
+                Map<String, Object> context = f.getContext();
+                if (context == null || context.isEmpty()) {
+                    context = new java.util.HashMap<>();
+                } else {
+                    context = new java.util.HashMap<>(context);
+                }
+                context.put("clusterId", clusterId);
+                f.setContext(context);
+            });
+            allFaults.addAll(faults);
+        }
+
+        log.info("Found {} faults in {} cronjobs", allFaults.size(), cronJobs.size());
+        return allFaults;
+    }
+
+    /**
+     * 전체 CronJob 스캔
+     */
+    public List<FaultInfo> scanAllCronJobs(String clusterId) {
+        log.info("Scanning all cronjobs in cluster {}", clusterId);
+
+        List<FaultInfo> allFaults = new ArrayList<>();
+        List<io.fabric8.kubernetes.api.model.Namespace> namespaces = k8sService.listNamespaces(clusterId);
+
+        for (io.fabric8.kubernetes.api.model.Namespace ns : namespaces) {
+            allFaults.addAll(scanCronJobsInNamespace(clusterId, ns.getMetadata().getName()));
+        }
+
+        log.info("Found {} total cronjob faults", allFaults.size());
+        return allFaults;
+    }
+
+    /**
      * 노드 스캔
      */
     public List<FaultInfo> scanNodes(String clusterId) {
@@ -264,6 +368,18 @@ public class DiagnosticsService {
         allFaults.addAll(scanAllDaemonSets(clusterId));
         allFaults.addAll(scanAllStatefulSets(clusterId));
         allFaults.addAll(scanAllReplicaSets(clusterId));
+
+        // Job/CronJob 스캔 (실패해도 다른 스캔 결과는 유지)
+        try {
+            allFaults.addAll(scanAllJobs(clusterId));
+        } catch (Exception e) {
+            log.warn("Failed to scan jobs: {}", e.getMessage());
+        }
+        try {
+            allFaults.addAll(scanAllCronJobs(clusterId));
+        } catch (Exception e) {
+            log.warn("Failed to scan cronjobs: {}", e.getMessage());
+        }
 
         // Node 스캔
         allFaults.addAll(scanNodes(clusterId));
@@ -373,6 +489,18 @@ public class DiagnosticsService {
         allFaults.addAll(scanDaemonSetsInNamespace(clusterId, namespace));
         allFaults.addAll(scanStatefulSetsInNamespace(clusterId, namespace));
         allFaults.addAll(scanReplicaSetsInNamespace(clusterId, namespace));
+
+        // Job/CronJob 스캔 (실패해도 다른 스캔 결과는 유지)
+        try {
+            allFaults.addAll(scanJobsInNamespace(clusterId, namespace));
+        } catch (Exception e) {
+            log.warn("Failed to scan jobs in namespace {}: {}", namespace, e.getMessage());
+        }
+        try {
+            allFaults.addAll(scanCronJobsInNamespace(clusterId, namespace));
+        } catch (Exception e) {
+            log.warn("Failed to scan cronjobs in namespace {}: {}", namespace, e.getMessage());
+        }
 
         log.info("Namespace scan completed. Found {} total faults", allFaults.size());
         return allFaults;

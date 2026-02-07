@@ -9,7 +9,12 @@
       "Bash(cmd.exe /c \"cd /d D:\\\\workspace\\\\vibecoding\\\\k8s-doctor && gradlew.bat build -x test\")",
       "Bash(del /F \"D:\\\\workspace\\\\vibecoding\\\\k8s-doctor\\\\data\\\\k8s-doctor.mv.db.lock.db\")",
       "Bash(netstat:*)",
-      "Bash(taskkill //F //PID 19596)"
+      "Bash(taskkill //F //PID 19596)",
+      "Bash(cmd.exe /c \"gradlew.bat build -x test\")",
+      "Bash(.\\\\gradlew.bat build:*)",
+      "Bash(cmd /c:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell.exe -Command \"cd ''D:\\\\workspace\\\\vibecoding\\\\k8s-doctor''; .\\\\gradlew.bat build -x test\")"
     ]
   }
 }

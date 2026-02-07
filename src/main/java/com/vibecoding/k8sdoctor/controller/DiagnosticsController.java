@@ -50,17 +50,19 @@ public class DiagnosticsController {
         // 빠른 장애 탐지만 수행 (AI 분석 제외)
         List<FaultInfo> faults = diagnosticsService.scanCluster(clusterId);
 
-        // Pod별로 가장 심각한 장애만 선택 (중복 제거)
-        Map<String, FaultInfo> uniquePodFaults = faults.stream()
-                .filter(f -> "Pod".equals(f.getResourceKind()))
+        // 리소스별로 가장 심각한 장애만 선택 (중복 제거) - Pod, Job, CronJob 포함
+        Map<String, FaultInfo> uniqueFaults = faults.stream()
+                .filter(f -> "Pod".equals(f.getResourceKind()) ||
+                             "Job".equals(f.getResourceKind()) ||
+                             "CronJob".equals(f.getResourceKind()))
                 .collect(Collectors.toMap(
-                        f -> f.getNamespace() + "/" + f.getResourceName(), // 키: namespace/podName
-                        f -> f, // 값: FaultInfo
-                        (f1, f2) -> f1.getSeverity().ordinal() < f2.getSeverity().ordinal() ? f1 : f2 // 더 심각한 것 선택
+                        f -> f.getNamespace() + "/" + f.getResourceKind() + "/" + f.getResourceName(),
+                        f -> f,
+                        (f1, f2) -> f1.getSeverity().ordinal() < f2.getSeverity().ordinal() ? f1 : f2
                 ));
 
         // Namespace별로 그룹핑
-        Map<String, List<PodInfo>> podsByNamespace = uniquePodFaults.values().stream()
+        Map<String, List<PodInfo>> podsByNamespace = uniqueFaults.values().stream()
                 .collect(Collectors.groupingBy(
                         f -> f.getNamespace() != null ? f.getNamespace() : "default",
                         Collectors.mapping(f -> new PodInfo(
@@ -73,7 +75,7 @@ public class DiagnosticsController {
                 ));
 
         // 통계 (중복 제거된 장애만 계산)
-        FaultClassificationService.FaultStatistics stats = faultService.getStatistics(new ArrayList<>(uniquePodFaults.values()));
+        FaultClassificationService.FaultStatistics stats = faultService.getStatistics(new ArrayList<>(uniqueFaults.values()));
 
         model.addAttribute("cluster", cluster);
         model.addAttribute("podsByNamespace", podsByNamespace);
@@ -128,7 +130,10 @@ public class DiagnosticsController {
             // 빠른 장애 탐지
             List<FaultInfo> allFaults = diagnosticsService.scanNamespace(clusterId, namespace);
             List<FaultInfo> podFaults = allFaults.stream()
-                    .filter(f -> name.equals(f.getResourceName()))
+                    .filter(f -> name.equals(f.getResourceName()) &&
+                                 ("Pod".equals(f.getResourceKind()) ||
+                                  "Job".equals(f.getResourceKind()) ||
+                                  "CronJob".equals(f.getResourceKind())))
                     .collect(Collectors.toList());
 
             if (podFaults.isEmpty()) {

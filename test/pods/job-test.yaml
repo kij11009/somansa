@@ -72,10 +72,8 @@ spec:
         - -c
         args:
         - |
-          echo "This job will fail intentionally"
           echo "Attempt: $(cat /dev/urandom | tr -dc '0-9' | fold -w 1 | head -n 1)"
           sleep 5
-          echo "Failing now..."
           exit 1
 
 ---

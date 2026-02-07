@@ -72,24 +72,38 @@ public class PendingDetector implements FaultDetector {
         }
 
         // PVC 관련 문제인 경우 추가 정보 수집
-        if (reason.contains("PVC") || reason.contains("PersistentVolume") || reason.contains("StorageClass") ||
-            reason.contains("바인딩") || reason.contains("unbound")) {
+        String lowerReason = reason.toLowerCase();
+        String lowerMessage = schedulingMessage.toLowerCase();
+
+        if (lowerReason.contains("pvc") || lowerReason.contains("persistentvolume") || lowerReason.contains("storageclass") ||
+            lowerReason.contains("바인딩") || lowerReason.contains("unbound")) {
             context.put("issueCategory", "PVC_BINDING");
             context.put("checkCommands", "kubectl get storageclass, kubectl get pvc, kubectl get pv");
-        } else if (reason.contains("CPU") || reason.contains("cpu")) {
+        } else if (lowerReason.contains("cpu") || lowerMessage.contains("insufficient cpu")) {
             context.put("issueCategory", "RESOURCE_SHORTAGE_CPU");
             context.put("checkCommands", "kubectl describe nodes | grep -A5 'Allocated resources'");
-        } else if (reason.contains("memory") || reason.contains("메모리")) {
+        } else if (lowerReason.contains("memory") || lowerReason.contains("메모리") || lowerMessage.contains("insufficient memory")) {
             context.put("issueCategory", "RESOURCE_SHORTAGE_MEMORY");
             context.put("checkCommands", "kubectl describe nodes | grep -A5 'Allocated resources'");
-        } else if (reason.contains("리소스") || reason.contains("Insufficient")) {
+        } else if (lowerReason.contains("리소스") || lowerReason.contains("insufficient") || lowerMessage.contains("insufficient")) {
             context.put("issueCategory", "RESOURCE_SHORTAGE");
             context.put("checkCommands", "kubectl describe nodes, kubectl top nodes");
-        } else if (reason.contains("Taint") || reason.contains("Toleration") || reason.contains("taint")) {
+        } else if (lowerReason.contains("taint") || lowerReason.contains("toleration") || lowerMessage.contains("taint")) {
             context.put("issueCategory", "TAINT_TOLERATION");
             context.put("checkCommands", "kubectl describe nodes | grep -A3 Taints");
-        } else if (reason.contains("node") || reason.contains("affinity") || reason.contains("selector")) {
-            context.put("issueCategory", "NODE_SELECTION");
+        } else if (lowerMessage.contains("topologyspreadconstraints") || lowerMessage.contains("topology spread")) {
+            context.put("issueCategory", "TOPOLOGY_SPREAD_CONSTRAINTS");
+            context.put("checkCommands", "kubectl describe nodes, kubectl get pods -o wide");
+        } else if (lowerMessage.contains("anti-affinity") || lowerMessage.contains("podantiaffinity") ||
+                   (lowerMessage.contains("affinity") && lowerMessage.contains("pod"))) {
+            context.put("issueCategory", "POD_ANTI_AFFINITY");
+            context.put("checkCommands", "kubectl get pods -o wide, kubectl describe pod POD_NAME");
+        } else if (lowerReason.contains("affinity") || lowerMessage.contains("nodeaffinity") || lowerMessage.contains("node affinity")) {
+            context.put("issueCategory", "NODE_AFFINITY");
+            context.put("checkCommands", "kubectl get nodes --show-labels, kubectl describe pod POD_NAME");
+        } else if (lowerReason.contains("node") || lowerReason.contains("selector") || lowerMessage.contains("nodeselector") ||
+                   lowerMessage.contains("matchnodeselector")) {
+            context.put("issueCategory", "NODE_SELECTOR");
             context.put("checkCommands", "kubectl get nodes --show-labels");
         }
 
@@ -145,9 +159,25 @@ public class PendingDetector implements FaultDetector {
                                "Pod에 적절한 Toleration을 추가하거나 노드의 Taint를 제거하세요.";
                     }
 
-                    // Pod Affinity/Anti-Affinity 문제 감지
+                    // TopologySpreadConstraints 문제 감지
+                    if (message.contains("TopologySpreadConstraints") || message.contains("topology spread")) {
+                        return "TopologySpreadConstraints 조건을 만족할 수 없습니다. " +
+                               "Pod을 분산 배치할 토폴로지 영역(zone, node)이 부족하거나 " +
+                               "maxSkew 제약 조건을 만족할 수 없습니다. " +
+                               "whenUnsatisfiable을 ScheduleAnyway로 변경하거나 노드/영역을 추가하세요.";
+                    }
+
+                    // Pod Anti-Affinity 문제 감지
+                    if (message.contains("anti-affinity") || message.contains("PodAntiAffinity") ||
+                        (message.toLowerCase().contains("affinity") && message.toLowerCase().contains("pod"))) {
+                        return "Pod Anti-Affinity 조건을 만족하는 노드가 없습니다. " +
+                               "같은 레이블의 Pod이 이미 모든 노드에 있어서 스케줄링할 수 없습니다. " +
+                               "노드를 추가하거나 Anti-Affinity 조건을 완화하세요.";
+                    }
+
+                    // Pod Affinity 문제 감지 (Anti-Affinity가 아닌 경우)
                     if (message.contains("Affinity") || message.contains("affinity")) {
-                        return "Pod Affinity/Anti-Affinity 조건을 만족하는 노드가 없습니다. " +
+                        return "Pod Affinity 조건을 만족하는 노드가 없습니다. " +
                                "Pod의 affinity 설정을 확인하세요.";
                     }
 

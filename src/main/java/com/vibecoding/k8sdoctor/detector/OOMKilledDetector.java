@@ -79,28 +79,53 @@ public class OOMKilledDetector implements FaultDetector {
             }
         }
 
+        // 현재 컨테이너의 메모리 리소스 설정값 추출
+        String memoryLimit = "";
+        String memoryRequest = "";
+        if (pod.getSpec() != null && pod.getSpec().getContainers() != null) {
+            for (var container : pod.getSpec().getContainers()) {
+                if (container.getName().equals(status.getName()) && container.getResources() != null) {
+                    if (container.getResources().getLimits() != null &&
+                        container.getResources().getLimits().get("memory") != null) {
+                        memoryLimit = container.getResources().getLimits().get("memory").toString();
+                    }
+                    if (container.getResources().getRequests() != null &&
+                        container.getResources().getRequests().get("memory") != null) {
+                        memoryRequest = container.getResources().getRequests().get("memory").toString();
+                    }
+                    break;
+                }
+            }
+        }
+
+        Map<String, Object> context = new java.util.HashMap<>();
+        context.put("containerName", status.getName());
+        context.put("exitCode", exitCode);
+        context.put("restartCount", restartCount);
+        context.put("ownerKind", ownerKind);
+        context.put("ownerName", ownerName);
+        if (!memoryLimit.isEmpty()) context.put("memoryLimit", memoryLimit);
+        if (!memoryRequest.isEmpty()) context.put("memoryRequest", memoryRequest);
+
         return FaultInfo.builder()
                 .faultType(FaultType.OOM_KILLED)
                 .severity(Severity.CRITICAL)
                 .resourceKind("Pod")
                 .namespace(pod.getMetadata().getNamespace())
                 .resourceName(pod.getMetadata().getName())
-                .summary(String.format("메모리 부족으로 컨테이너 종료됨: %s", status.getName()))
+                .summary(String.format("메모리 부족으로 컨테이너 종료됨: %s (limit: %s)",
+                        status.getName(), memoryLimit.isEmpty() ? "미설정" : memoryLimit))
                 .description("컨테이너가 메모리 제한을 초과하여 강제 종료되었습니다. " +
                         "메모리 limits을 증가시키거나 애플리케이션의 메모리 사용량을 최적화해야 합니다.")
                 .symptoms(Arrays.asList(
                         "컨테이너가 갑자기 종료됨",
                         String.format("종료 코드: %d (OOMKilled)", exitCode),
                         String.format("재시작 횟수: %d회", restartCount),
-                        "메모리 사용량이 제한에 도달함"
+                        String.format("현재 메모리 설정 - requests: %s, limits: %s",
+                                memoryRequest.isEmpty() ? "미설정" : memoryRequest,
+                                memoryLimit.isEmpty() ? "미설정" : memoryLimit)
                 ))
-                .context(Map.of(
-                        "containerName", status.getName(),
-                        "exitCode", exitCode,
-                        "restartCount", restartCount,
-                        "ownerKind", ownerKind,
-                        "ownerName", ownerName
-                ))
+                .context(context)
                 .detectedAt(LocalDateTime.now())
                 .build();
     }

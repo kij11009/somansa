@@ -84,6 +84,9 @@ public class ClusterService {
             // 연결 테스트 및 정보 수집
             ClusterInfo info = collectClusterInfo(clusterId, config, client);
 
+            // 새로운 클러스터 등록이므로 createdAt 설정
+            info.setCreatedAt(LocalDateTime.now());
+
             // 저장
             clusterRepository.saveConfig(config);
             clusterRepository.saveInfo(info);
@@ -126,7 +129,7 @@ public class ClusterService {
     }
 
     /**
-     * 클러스터 정보 수집
+     * 클러스터 정보 수집 (createdAt은 호출자가 설정해야 함)
      */
     private ClusterInfo collectClusterInfo(String clusterId, ClusterConfig config, KubernetesClient client) {
         try {
@@ -152,7 +155,6 @@ public class ClusterService {
                 .apiServerUrl(apiServerUrl)
                 .version(version)
                 .status(ClusterStatus.CONNECTED)
-                .createdAt(LocalDateTime.now())
                 .lastChecked(LocalDateTime.now())
                 .nodeCount(nodeCount)
                 .namespaceCount(namespaceCount)
@@ -212,9 +214,17 @@ public class ClusterService {
         ClusterConfig config = configOpt.get();
         ClusterInfo info = infoOpt.get();
 
+        // 기존 createdAt 값 보존
+        LocalDateTime originalCreatedAt = info.getCreatedAt();
+
         try {
-            // 연결 테스트
+            // 연결 테스트 및 정보 수집
             ClusterInfo updatedInfo = collectClusterInfo(clusterId, config, client);
+
+            // createdAt은 기존 값 유지, lastChecked만 현재 시간으로 업데이트
+            updatedInfo.setCreatedAt(originalCreatedAt);
+            updatedInfo.setLastChecked(LocalDateTime.now());
+
             clusterRepository.saveInfo(updatedInfo);
 
             log.info("Cluster connection test successful: {}", clusterId);
@@ -223,7 +233,7 @@ public class ClusterService {
         } catch (Exception e) {
             log.error("Cluster connection test failed: {}", clusterId, e);
 
-            // 에러 상태로 업데이트
+            // 에러 상태로 업데이트 (createdAt 유지)
             info.setStatus(ClusterStatus.ERROR);
             info.setLastChecked(LocalDateTime.now());
             clusterRepository.saveInfo(info);

@@ -104,17 +104,17 @@
         <!-- Issues by Namespace -->
         <div th:if="${podsByNamespace != null and !#maps.isEmpty(podsByNamespace)}">
             <div th:each="nsEntry : ${podsByNamespace}" class="card mb-3">
-                <div class="card-header d-flex justify-content-between align-items-center" style="cursor:pointer;" th:onclick="'toggleNs(\\'' + ${nsEntry.key} + '\\')'">
+                <div class="card-header d-flex justify-content-between align-items-center" style="cursor:pointer;" onclick="toggleNs(this)">
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-folder text-muted"></i>
                         <span class="fw-semibold" th:text="${nsEntry.key}">Namespace</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="badge bg-warning" th:text="${#lists.size(nsEntry.value)} + ' issues'">0 issues</span>
-                        <i class="bi bi-chevron-down text-muted" th:id="'chevron-' + ${nsEntry.key}" style="transition:transform 0.2s;"></i>
+                        <i class="bi bi-chevron-down text-muted" style="transition:transform 0.2s;transform:rotate(-90deg);"></i>
                     </div>
                 </div>
-                <div class="card-body" th:id="'ns-' + ${nsEntry.key}">
+                <div class="card-body" style="display:none;">
                     <div th:each="pod : ${nsEntry.value}"
                          class="fault-item"
                          th:classappend="'severity-' + ${pod.severity.name().toLowerCase()}"
@@ -151,15 +151,15 @@
     <script>
         let diagnosing = null;
 
-        function toggleNs(ns) {
-            const el = document.getElementById('ns-' + ns);
-            const chev = document.getElementById('chevron-' + ns);
-            if (el.style.display === 'none') {
-                el.style.display = 'block';
-                chev.style.transform = 'rotate(0deg)';
+        function toggleNs(header) {
+            const body = header.nextElementSibling;
+            const chev = header.querySelector('.bi-chevron-down');
+            if (body.style.display === 'none') {
+                body.style.display = '';
+                if (chev) chev.style.transform = 'rotate(0deg)';
             } else {
-                el.style.display = 'none';
-                chev.style.transform = 'rotate(-90deg)';
+                body.style.display = 'none';
+                if (chev) chev.style.transform = 'rotate(-90deg)';
             }
         }
 
@@ -268,6 +268,72 @@
             }
 
             panel.innerHTML = html || '<div class="text-muted text-center py-3">No diagnosis available</div>';
+            highlightYamlBlocks(panel);
+        }
+
+        function highlightYamlBlocks(container) {
+            // pre.yaml-code 안의 code, 또는 pre.yaml-code 자체
+            let codeBlocks = container.querySelectorAll('pre.yaml-code code');
+            if (!codeBlocks.length) codeBlocks = container.querySelectorAll('pre.yaml-code');
+            if (!codeBlocks.length) codeBlocks = container.querySelectorAll('pre code');
+
+            codeBlocks.forEach(code => {
+                const text = code.textContent;
+                if (!text || !text.trim()) return;
+                const lines = text.split('\n');
+                let hasInlineComment = false;
+
+                // 구조키 (하이라이트 제외)
+                const structKeys = new Set(['apiVersion','kind','metadata','spec','template',
+                    'containers','volumes','volumeMounts','ports','env','selector',
+                    'matchLabels','labels','annotations','initContainers','envFrom',
+                    'volumeClaimTemplates','resources','requests','limits','name','namespace']);
+
+                // 1차: 분류
+                const classified = lines.map(line => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return { type: 'normal', line };
+                    if (line.indexOf('기존 유지') !== -1) return { type: 'dim', line };
+                    // 인라인 주석 (값 뒤에 #)
+                    if (!trimmed.startsWith('#') && trimmed.indexOf('#') !== -1) {
+                        hasInlineComment = true;
+                        return { type: 'changed', line };
+                    }
+                    return { type: 'normal', line };
+                });
+
+                // 2차: 인라인 주석 없으면 폴백 - 값 라인 하이라이트
+                const finalLines = classified.map(item => {
+                    if (item.type !== 'normal') return item;
+                    if (!hasInlineComment) {
+                        const trimmed = item.line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) return item;
+                        // key: value 패턴 (값이 있는 라인만)
+                        const colonPos = trimmed.indexOf(': ');
+                        if (colonPos > 0) {
+                            const key = trimmed.substring(0, colonPos).replace(/^-\s*/, '').trim();
+                            const val = trimmed.substring(colonPos + 2).trim();
+                            if (val && !structKeys.has(key)) {
+                                return { type: 'changed', line: item.line };
+                            }
+                        }
+                    }
+                    return item;
+                });
+
+                // 인라인 스타일로 직접 적용 (CSS 캐싱 문제 방지)
+                const STYLE_CHANGED = 'color:#ff6b6b;background:rgba(255,80,80,0.15)';
+                const STYLE_DIM = 'color:#666';
+
+                const newHtml = finalLines.map(item => {
+                    const escaped = item.line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    if (item.type === 'changed') return `<span style="${STYLE_CHANGED}">${escaped}</span>`;
+                    if (item.type === 'dim') return `<span style="${STYLE_DIM}">${escaped}</span>`;
+                    return escaped;
+                }).join('\n');
+
+                code.innerHTML = newHtml;
+            });
         }
 
         function esc(t) {

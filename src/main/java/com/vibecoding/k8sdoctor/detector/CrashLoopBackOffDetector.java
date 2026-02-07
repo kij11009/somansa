@@ -90,6 +90,31 @@ public class CrashLoopBackOffDetector implements FaultDetector {
         // exitCode에 따른 구체적인 설명 추가
         String exitCodeDesc = getExitCodeDescription(exitCode);
 
+        // 이슈 카테고리 분류
+        String issueCategory = classifyIssue(exitCode, terminationReason, terminationMessage);
+
+        // 컨테이너의 liveness/startup probe 설정 확인
+        boolean hasLivenessProbe = false;
+        boolean hasStartupProbe = false;
+        if (pod.getSpec() != null && pod.getSpec().getContainers() != null) {
+            for (var container : pod.getSpec().getContainers()) {
+                if (container.getName().equals(status.getName())) {
+                    hasLivenessProbe = container.getLivenessProbe() != null;
+                    hasStartupProbe = container.getStartupProbe() != null;
+                    break;
+                }
+            }
+        }
+
+        // exit 137 + probe 있음 + OOMKilled 아님 → probe kill 가능성 높음
+        if ("SIGKILL_NOT_OOM".equals(issueCategory)) {
+            if (hasStartupProbe) {
+                issueCategory = "STARTUP_PROBE_KILLED";
+            } else if (hasLivenessProbe) {
+                issueCategory = "LIVENESS_PROBE_KILLED";
+            }
+        }
+
         // context에 더 많은 정보 추가
         java.util.Map<String, Object> context = new java.util.HashMap<>();
         context.put("containerName", status.getName());
@@ -98,12 +123,15 @@ public class CrashLoopBackOffDetector implements FaultDetector {
         context.put("ownerKind", ownerKind);
         context.put("ownerName", ownerName);
         context.put("exitCode", exitCode);
+        context.put("issueCategory", issueCategory);
         if (!terminationReason.isEmpty()) {
             context.put("terminationReason", terminationReason);
         }
         if (!terminationMessage.isEmpty()) {
             context.put("terminationMessage", terminationMessage);
         }
+        if (hasLivenessProbe) context.put("hasLivenessProbe", true);
+        if (hasStartupProbe) context.put("hasStartupProbe", true);
 
         List<String> symptoms = new ArrayList<>(Arrays.asList(
                 "컨테이너가 시작 후 즉시 종료됨",
@@ -128,6 +156,57 @@ public class CrashLoopBackOffDetector implements FaultDetector {
                 .context(context)
                 .detectedAt(LocalDateTime.now())
                 .build();
+    }
+
+    /**
+     * CrashLoopBackOff 이슈 카테고리 분류
+     */
+    private String classifyIssue(int exitCode, String terminationReason, String terminationMessage) {
+        String lowerMessage = terminationMessage.toLowerCase();
+        String lowerReason = terminationReason.toLowerCase();
+
+        // OOMKilled - reason이 명시적으로 OOMKilled인 경우만
+        if ("oomkilled".equals(lowerReason)) {
+            return "OOM_KILLED";
+        }
+
+        // Probe 실패 - Events에서 확인해야 하지만 단서가 있을 수 있음
+        if (lowerMessage.contains("liveness") || lowerMessage.contains("probe")) {
+            return "LIVENESS_PROBE_KILLED";
+        }
+        if (lowerMessage.contains("startup") && lowerMessage.contains("probe")) {
+            return "STARTUP_PROBE_KILLED";
+        }
+
+        // Exit 137 but NOT OOMKilled → SIGKILL (liveness probe 또는 외부 kill)
+        if (exitCode == 137) {
+            return "SIGKILL_NOT_OOM";
+        }
+
+        // 명령어/실행 오류
+        if (exitCode == 127) {
+            return "COMMAND_NOT_FOUND";
+        }
+        if (exitCode == 126) {
+            return "PERMISSION_DENIED";
+        }
+
+        // 애플리케이션 오류
+        if (exitCode == 1) {
+            return "APPLICATION_ERROR";
+        }
+
+        // SIGTERM으로 정상 종료 시도됨 (probe로 인한 종료 가능성)
+        if (exitCode == 143) {
+            return "SIGTERM_RECEIVED";
+        }
+
+        // 기타 시그널
+        if (exitCode > 128 && exitCode < 255) {
+            return "SIGNAL_KILLED";
+        }
+
+        return "UNKNOWN";
     }
 
     /**

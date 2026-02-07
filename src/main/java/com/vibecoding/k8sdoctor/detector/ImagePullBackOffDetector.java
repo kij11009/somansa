@@ -104,6 +104,26 @@ public class ImagePullBackOffDetector implements FaultDetector {
         ));
         symptoms.add("에러 유형: " + errorCategory);
 
+        // 에러 카테고리별 추가 증상
+        switch (errorCategory) {
+            case "X509_CERTIFICATE_ERROR":
+                symptoms.add("TLS/SSL 인증서 검증 실패");
+                symptoms.add("자체 서명 또는 신뢰되지 않는 CA 인증서");
+                break;
+            case "AUTHENTICATION_FAILED":
+                symptoms.add("레지스트리 인증 실패 (401/403)");
+                break;
+            case "IMAGE_NOT_FOUND":
+                symptoms.add("이미지 또는 태그를 찾을 수 없음 (404)");
+                break;
+            case "RATE_LIMITED":
+                symptoms.add("레지스트리 Rate Limit 초과 (429)");
+                break;
+            case "REGISTRY_UNREACHABLE":
+                symptoms.add("레지스트리 네트워크 연결 실패");
+                break;
+        }
+
         return FaultInfo.builder()
                 .faultType(FaultType.IMAGE_PULL_BACK_OFF)
                 .severity(Severity.CRITICAL)
@@ -129,6 +149,13 @@ public class ImagePullBackOffDetector implements FaultDetector {
         }
 
         String lowerMessage = message.toLowerCase();
+
+        // x509 인증서 오류 (TLS/SSL)
+        if (lowerMessage.contains("x509") || lowerMessage.contains("certificate") ||
+            lowerMessage.contains("tls") || lowerMessage.contains("ssl") ||
+            lowerMessage.contains("cert verify") || lowerMessage.contains("certificate signed by unknown authority")) {
+            return "X509_CERTIFICATE_ERROR";
+        }
 
         // 인증 실패
         if (lowerMessage.contains("401") || lowerMessage.contains("unauthorized") ||
