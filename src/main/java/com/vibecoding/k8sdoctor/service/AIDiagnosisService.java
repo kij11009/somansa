@@ -12,6 +12,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import io.fabric8.kubernetes.client.utils.Serialization;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -127,8 +129,16 @@ public class AIDiagnosisService {
             }
         }
 
+        // 리소스 YAML spec 수집
+        String resourceYaml = "";
+        try {
+            resourceYaml = fetchResourceSpec(fault);
+        } catch (Exception e) {
+            log.warn("Failed to fetch resource spec: {}", e.getMessage());
+        }
+
         // AI에게 진단 요청
-        String aiResponse = requestAIDiagnosis(fault, relatedFaults, logs, events);
+        String aiResponse = requestAIDiagnosis(fault, relatedFaults, logs, events, resourceYaml);
 
         // AI 응답 파싱
         DiagnosisResult result = parseAIResponse(fault, relatedFaults, aiResponse);
@@ -251,9 +261,9 @@ public class AIDiagnosisService {
     /**
      * AI에게 진단 요청 (XML 프롬프트, 토큰 최적화)
      */
-    private String requestAIDiagnosis(FaultInfo fault, List<FaultInfo> relatedFaults, String logs, List<io.fabric8.kubernetes.api.model.Event> events) {
+    private String requestAIDiagnosis(FaultInfo fault, List<FaultInfo> relatedFaults, String logs, List<io.fabric8.kubernetes.api.model.Event> events, String resourceYaml) {
         try {
-            String userPrompt = buildDiagnosisPrompt(fault, relatedFaults, logs, events);
+            String userPrompt = buildDiagnosisPrompt(fault, relatedFaults, logs, events, resourceYaml);
 
             // Owner 정보에 따라 파일명 결정
             String ownerKind = fault.getContext() != null ?
@@ -350,7 +360,7 @@ public class AIDiagnosisService {
     /**
      * 진단 프롬프트 생성 - 토큰 최적화 (핵심 정보만)
      */
-    private String buildDiagnosisPrompt(FaultInfo fault, List<FaultInfo> relatedFaults, String logs, List<io.fabric8.kubernetes.api.model.Event> events) {
+    private String buildDiagnosisPrompt(FaultInfo fault, List<FaultInfo> relatedFaults, String logs, List<io.fabric8.kubernetes.api.model.Event> events, String resourceYaml) {
         StringBuilder prompt = new StringBuilder();
 
         // Owner 정보 추출
@@ -498,6 +508,11 @@ public class AIDiagnosisService {
             }
         }
 
+        // 리소스 YAML spec
+        if (resourceYaml != null && !resourceYaml.isBlank()) {
+            prompt.append("\n## Resource Spec (참고용-YAML출력시 변경필드만 출력할것)\n```yaml\n").append(resourceYaml).append("\n```\n");
+        }
+
         // CrashLoopBackOff 여부
         boolean isCrashLoop = fault.getFaultType() == com.vibecoding.k8sdoctor.model.FaultType.CRASH_LOOP_BACK_OFF;
 
@@ -537,7 +552,8 @@ public class AIDiagnosisService {
         String rootCause = "";
         List<String> solutions = new ArrayList<>();
         List<String> preventions = new ArrayList<>();
-        String diagnosis = aiResponse;
+        // "변경 검증" 섹션은 AI 내부 자기검증용이므로 UI에서 제거
+        String diagnosis = aiResponse.replaceAll("(?s)### 변경 검증.*?(?=### 재발 방지|$)", "");
 
         try {
             // "근본 원인" 섹션 추출
@@ -890,8 +906,9 @@ public class AIDiagnosisService {
         // 내부 프로세스 룰 - 진단/솔루션 분리
         prompt.append("<process>\n");
         prompt.append("1. root cause 1개 확정 (후보 나열 금지)\n");
-        prompt.append("2. 확정된 원인에 맞는 YAML 1개만 출력\n");
-        prompt.append("3. 확정 불가 => '추가 필요 데이터' 1개만 요청\n");
+        prompt.append("2. YAML 작성\n");
+        prompt.append("3. 자기검증: YAML에서 변경한 필드가 장애의 원인인가? 아니면 장애를 감지하는 설정인가? 감지설정을 변경했으면 YAML 폐기→원인필드 수정으로 재작성\n");
+        prompt.append("4. 확정 불가 => '추가 필요 데이터' 1개만 요청\n");
         prompt.append("</process>\n\n");
 
         // 기본 제약 조건 - 키워드 룰 형태
@@ -903,7 +920,14 @@ public class AIDiagnosisService {
         prompt.append("# CrashLoopBackOff (Logs기반, Events 무시)\n");
         prompt.append("Logs 에러 인용 필수, 없으면 '로그 확인 필요' 명시\n\n");
         prompt.append("# 공통\n");
-        prompt.append("bash/sh 금지, 문장 끝 콜론 금지, Pod 직접수정 금지(Owner 수정)\n");
+        prompt.append("bash/sh 금지, 문장 끝 콜론 금지, Pod 직접수정 금지(Owner 수정)\n\n");
+        prompt.append("# WRONG vs RIGHT (반드시 RIGHT 패턴만 사용!)\n");
+        prompt.append("WRONG: probe가 cat /file 실패 → probe.exec.command를 true로 변경 (감지설정 무력화)\n");
+        prompt.append("RIGHT: probe가 cat /file 실패 → container command에 touch /file 추가 (원인 해결)\n");
+        prompt.append("WRONG: OOM → limits.memory 삭제 (보호설정 제거)\n");
+        prompt.append("RIGHT: OOM → limits.memory 값 증가 (원인 해결)\n");
+        prompt.append("WRONG: NetworkPolicy 차단 → policy 삭제 (보안설정 제거)\n");
+        prompt.append("RIGHT: NetworkPolicy 차단 → 필요한 포트/대상만 allow rule 추가 (원인 해결)\n");
         prompt.append("</constraints>\n\n");
 
         // 장애 유형별 구체적인 진단 규칙 추가
@@ -918,6 +942,7 @@ public class AIDiagnosisService {
         prompt.append("금지: '기존 유지'를 변경필드에 사용, 미변경필드를 하위내용 포함해서 나열\n");
         prompt.append("금지cmd: apply -f, get pods, describe pod\n");
         prompt.append("허용cmd: rollout, logs --previous, exec, get events, top\n");
+        prompt.append("Resource Spec 제공시 현재값 기반 수정 YAML 작성 (spec의 실제 값 인용)\n");
         prompt.append("</solution_requirements>\n\n");
 
         // 플레이스홀더
@@ -929,6 +954,10 @@ public class AIDiagnosisService {
         prompt.append("<output_format>\n");
         prompt.append("### 근본 원인 (1-2문장)\n");
         prompt.append("### 해결 방법 (1-2단계, YAML 1개)\n");
+        prompt.append("### 변경 검증\n");
+        prompt.append("변경필드: (수정한 YAML 필드명)\n");
+        prompt.append("이 필드가 장애 원인인가 감지설정인가: (원인/감지)\n");
+        prompt.append("(감지이면 YAML을 폐기하고 원인필드를 수정하여 해결 방법을 다시 작성)\n");
         prompt.append("### 재발 방지 (2-3개)\n");
         prompt.append("</output_format>");
 
@@ -1129,7 +1158,7 @@ public class AIDiagnosisService {
                "panic/Exception => APP_ERROR (스택트레이스)\n" +
                "SSL/certificate => TLS_ERROR\n" +
                "로그없음 => 'kubectl logs --previous' 안내\n\n" +
-               "Category:LIVENESS_PROBE_KILLED => livenessProbe 실패가 원인! OOM 아님! probe설정/endpoint 수정\n" +
+               "Category:LIVENESS_PROBE_KILLED => livenessProbe 실패가 원인! OOM 아님! probe의 대상경로/포트/명령을 근본원인에 맞게 수정\n" +
                "Category:STARTUP_PROBE_KILLED => startupProbe 실패가 원인! OOM 아님! failureThreshold*periodSeconds 늘리기\n" +
                "DB연결실패 우선순위: 1)앱복원력 2)startupProbe 3)readiness+liveness분리 4)initContainer\n" +
                "금지: livenessProbe에 DB체크\n" +
@@ -1201,7 +1230,10 @@ public class AIDiagnosisService {
     private String getProbeFailedRules(com.vibecoding.k8sdoctor.model.FaultType faultType) {
         String probeType = faultType == com.vibecoding.k8sdoctor.model.FaultType.LIVENESS_PROBE_FAILED ? "Liveness" : "Readiness";
         return "## " + probeType + "ProbeFailed\n" +
-               "path/port오류 => endpoint확인\n" +
+               "원칙: probe 자체가 아닌, probe가 검사하는 대상을 고칠 것!\n" +
+               "exec cat/test 파일없음 => container command에서 해당파일 생성 (touch/echo>file)\n" +
+               "httpGet 실패 => 앱이 해당 path에 응답하도록 수정 또는 실제 응답하는 path로 변경\n" +
+               "tcpSocket 실패 => 앱이 해당 port listen하도록 수정\n" +
                "timeout => timeoutSeconds증가\n" +
                "slowStart => startupProbe사용\n";
     }
@@ -1337,6 +1369,211 @@ public class AIDiagnosisService {
         return "## Default\n" +
                "exit: 0=OK,1=ERR,137=OOM,143=SIGTERM\n" +
                "금지: 추측, Insufficient없이 리소스부족언급\n";
+    }
+
+    /**
+     * FaultInfo 기반으로 owner 리소스의 YAML spec을 가져와 핵심만 추출
+     */
+    private String fetchResourceSpec(FaultInfo fault) {
+        if (fault.getNamespace() == null) {
+            return "";
+        }
+
+        String clusterId = getClusterIdFromContext(fault);
+        String namespace = fault.getNamespace();
+        Map<String, Object> ctx = fault.getContext();
+
+        String ownerKind = ctx != null ? (String) ctx.getOrDefault("ownerKind", "") : "";
+        String ownerName = ctx != null ? (String) ctx.getOrDefault("ownerName", "") : "";
+
+        Object resource = null;
+
+        if ("Pod".equals(fault.getResourceKind())) {
+            switch (ownerKind) {
+                case "Deployment":
+                    resource = k8sService.getDeployment(clusterId, namespace, ownerName);
+                    break;
+                case "StatefulSet":
+                    resource = k8sService.getStatefulSet(clusterId, namespace, ownerName);
+                    break;
+                case "DaemonSet":
+                    resource = k8sService.getDaemonSet(clusterId, namespace, ownerName);
+                    break;
+                case "Job":
+                    resource = k8sService.getJob(clusterId, namespace, ownerName);
+                    break;
+                default:
+                    resource = k8sService.getPod(clusterId, namespace, fault.getResourceName());
+                    break;
+            }
+        } else if ("Job".equals(fault.getResourceKind())) {
+            if ("CronJob".equals(ownerKind)) {
+                resource = k8sService.getCronJob(clusterId, namespace, ownerName);
+            } else {
+                resource = k8sService.getJob(clusterId, namespace, fault.getResourceName());
+            }
+        } else if ("CronJob".equals(fault.getResourceKind())) {
+            resource = k8sService.getCronJob(clusterId, namespace, fault.getResourceName());
+        }
+
+        if (resource == null) {
+            return "";
+        }
+
+        String fullYaml = Serialization.asYaml(resource);
+        return extractEssentialSpec(fullYaml);
+    }
+
+    /**
+     * YAML에서 진단에 필요한 핵심 spec만 추출 (status 제거, metadata 축소, 최대 80줄)
+     */
+    private String extractEssentialSpec(String fullYaml) {
+        if (fullYaml == null || fullYaml.isBlank()) {
+            return "";
+        }
+
+        String[] lines = fullYaml.split("\n");
+        List<String> result = new ArrayList<>();
+        boolean inStatus = false;
+        boolean inSkipBlock = false;
+        int skipBlockIndent = -1;
+
+        // metadata 내 불필요한 필드
+        Set<String> skipMetadataFields = Set.of(
+            "uid:", "resourceVersion:", "generation:", "creationTimestamp:",
+            "managedFields:", "selfLink:", "annotations:", "ownerReferences:"
+        );
+
+        // spec 내 k8s 자동생성/기본값 필드 (진단에 불필요)
+        Set<String> noiseFields = Set.of(
+            "terminationMessagePath:", "terminationMessagePolicy:",
+            "dnsPolicy:", "enableServiceLinks:", "nodeName:",
+            "preemptionPolicy:", "priority:", "schedulerName:",
+            "serviceAccount:", "serviceAccountName:",
+            "terminationGracePeriodSeconds:", "imagePullPolicy:"
+        );
+
+        // 통째로 스킵할 블록 시작 패턴 (하위 라인 포함)
+        Set<String> noiseBlockStarts = Set.of(
+            "tolerations:", "managedFields:"
+        );
+
+        boolean inMetadata = false;
+
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            String trimmed = line.trim();
+            int indent = line.length() - line.stripLeading().length();
+
+            // 블록 스킵 중: 같거나 낮은 들여쓰기가 나오면 블록 종료
+            if (inSkipBlock) {
+                if (!trimmed.isEmpty() && indent <= skipBlockIndent) {
+                    inSkipBlock = false;
+                } else {
+                    continue;
+                }
+            }
+
+            // 최상위 status: 섹션 전체 스킵
+            if (trimmed.equals("status:") && indent == 0) {
+                inStatus = true;
+                continue;
+            }
+            if (inStatus) {
+                if (!trimmed.isEmpty() && indent == 0) {
+                    inStatus = false;
+                } else {
+                    continue;
+                }
+            }
+
+            // metadata 내 불필요 필드 (하위 블록 포함 스킵)
+            if (trimmed.equals("metadata:") && indent == 0) {
+                inMetadata = true;
+                result.add(line);
+                continue;
+            }
+            if (inMetadata) {
+                if (!trimmed.isEmpty() && indent == 0) {
+                    inMetadata = false;
+                } else {
+                    boolean skip = false;
+                    for (String sf : skipMetadataFields) {
+                        if (trimmed.startsWith(sf)) {
+                            skip = true;
+                            inSkipBlock = true;
+                            skipBlockIndent = indent;
+                            break;
+                        }
+                    }
+                    if (skip) continue;
+                }
+            }
+
+            // 블록 단위 noise 스킵 (tolerations, managedFields 등)
+            boolean isNoiseBlock = false;
+            for (String blockStart : noiseBlockStarts) {
+                if (trimmed.startsWith(blockStart)) {
+                    isNoiseBlock = true;
+                    break;
+                }
+            }
+            if (isNoiseBlock) {
+                inSkipBlock = true;
+                skipBlockIndent = indent;
+                continue;
+            }
+
+            // 단일 라인 noise 필드 스킵
+            boolean isNoise = false;
+            for (String nf : noiseFields) {
+                if (trimmed.startsWith(nf)) {
+                    isNoise = true;
+                    break;
+                }
+            }
+            if (isNoise) continue;
+
+            // "resources: {}" (빈 리소스) 스킵
+            if (trimmed.equals("resources: {}")) continue;
+
+            // kube-api-access 자동마운트 볼륨/볼륨마운트 블록 스킵
+            if (trimmed.contains("kube-api-access") || trimmed.contains("/var/run/secrets/kubernetes.io/serviceaccount")) {
+                // 이 라인이 list item (- mountPath: ...) 이면 해당 item 전체 스킵
+                // 아니면 해당 블록 스킵
+                inSkipBlock = true;
+                skipBlockIndent = indent;
+                continue;
+            }
+
+            result.add(line);
+        }
+
+        // 빈 volumes:/volumeMounts: 헤더 제거 (하위 항목이 전부 스킵된 경우)
+        for (int i = result.size() - 1; i >= 0; i--) {
+            String t = result.get(i).trim();
+            if (t.equals("volumes:") || t.equals("volumeMounts:")) {
+                // 다음 라인이 없거나 들여쓰기가 같거나 낮으면 빈 헤더
+                if (i == result.size() - 1) {
+                    result.remove(i);
+                } else {
+                    String nextTrimmed = result.get(i + 1).trim();
+                    int curIndent = result.get(i).length() - result.get(i).stripLeading().length();
+                    int nextIndent = result.get(i + 1).length() - result.get(i + 1).stripLeading().length();
+                    if (!nextTrimmed.isEmpty() && nextIndent <= curIndent) {
+                        result.remove(i);
+                    }
+                }
+            }
+        }
+
+        // 최대 60줄 제한
+        if (result.size() > 60) {
+            result = new ArrayList<>(result.subList(0, 60));
+            result.add("# ... (truncated)");
+        }
+
+        return String.join("\n", result);
     }
 
     /**
